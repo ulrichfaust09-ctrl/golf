@@ -1,0 +1,1759 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Pixel Links – Golf Course Maker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#d3e2c2; --panel:#f5f8ec; --ink:#1c2a3a; --muted:#5f7180; --line:#1c2a3a;
+  --accent:#e2443a; --accent-ink:#ffffff; --sel:#1c2a3a; --sel-ink:#f5f8ec; --good:#2f8f4e;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0f1a25; --panel:#172636; --ink:#e6efdc; --muted:#8aa0b2; --line:#050b11;
+    --accent:#f0705a; --accent-ink:#1a0a08; --sel:#e6efdc; --sel-ink:#0f1a25; --good:#66c987;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0f1a25; --panel:#172636; --ink:#e6efdc; --muted:#8aa0b2; --line:#050b11;
+  --accent:#f0705a; --accent-ink:#1a0a08; --sel:#e6efdc; --sel-ink:#0f1a25; --good:#66c987;
+}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*,*::before,*::after{box-sizing:border-box}
+[hidden]{display:none!important}
+body{
+  margin:0; background:var(--bg); color:var(--ink);
+  font-family:'Press Start 2P',ui-monospace,'Courier New',monospace;
+  font-size:10px; line-height:1.7;
+}
+.app{max-width:1320px;margin:0 auto;padding:16px}
+
+.btn{
+  font:inherit;font-size:10px;line-height:1.4;color:var(--ink);background:var(--panel);
+  border:3px solid var(--line);padding:9px 10px;cursor:pointer;box-shadow:0 4px 0 var(--line);
+  position:relative;top:0;text-align:center;
+}
+.btn.sm{font-size:8px;padding:9px 6px}
+.btn:hover{background:color-mix(in srgb,var(--panel) 80%,var(--accent))}
+.btn:active{top:4px;box-shadow:0 0 0 var(--line)}
+.btn:focus-visible,.text:focus-visible,input[type=range]:focus-visible,.thumb:focus-visible{outline:3px dashed var(--accent);outline-offset:3px}
+.btn.on{background:var(--sel);color:var(--sel-ink)}
+.btn.primary{background:var(--accent);color:var(--accent-ink)}
+.btn.primary:hover{filter:brightness(1.08)}
+.btn.big{width:100%;padding:14px 10px;font-size:12px}
+.btn.wide{width:100%}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.tabs{display:flex;gap:10px;flex-wrap:wrap}
+
+/* ---------- menu ---------- */
+.hero{position:relative;margin-bottom:22px}
+.hero canvas{display:block;width:100%;height:190px;object-fit:cover;object-position:center bottom;image-rendering:pixelated;image-rendering:crisp-edges;image-rendering:pixelated;border:4px solid var(--line);box-shadow:6px 6px 0 var(--line);background:#8cc8f0}
+.hero-text{position:absolute;left:14px;top:14px;background:var(--panel);border:3px solid var(--line);padding:10px 14px;box-shadow:4px 4px 0 var(--line);max-width:calc(100% - 28px)}
+.hero-text h1{font-size:18px;margin:0;line-height:1.3}
+.hero-text span{display:block;color:var(--muted);margin-top:4px}
+.menu-bar{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+.conn{color:var(--muted);margin-bottom:18px;line-height:1.8;min-height:18px}
+.conn.ok{color:var(--good)}
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:22px}
+.cc{background:var(--panel);border:3px solid var(--line);box-shadow:4px 4px 0 var(--line);display:flex;flex-direction:column;transition:transform .12s,box-shadow .12s}
+.cc:hover{transform:translate(-2px,-2px);box-shadow:6px 6px 0 var(--line)}
+.thumb{display:block;width:100%;padding:0;margin:0;border:0;border-bottom:3px solid var(--line);background:#101820;cursor:pointer;aspect-ratio:8/5;overflow:hidden}
+.thumb img{display:block;width:100%;height:100%;object-fit:cover;image-rendering:pixelated;image-rendering:crisp-edges;image-rendering:pixelated}
+.cc-body{padding:10px;display:flex;flex-direction:column;gap:6px;flex:1}
+.cc-title{font-size:11px;line-height:1.5;word-break:break-word}
+.cc-meta{color:var(--muted);font-size:8px;margin-bottom:6px}
+.cc-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:auto}
+.empty{grid-column:1/-1;background:var(--panel);border:3px dashed var(--line);padding:22px;line-height:2;text-align:center;color:var(--muted)}
+
+/* ---------- game ---------- */
+.game-head{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:16px}
+.game-title{flex:1;min-width:120px;font-size:12px;line-height:1.5;word-break:break-word}
+.seg{display:flex;gap:8px}
+.layout{display:grid;grid-template-columns:minmax(0,1fr) 264px;gap:20px;align-items:start}
+@media (max-width:900px){.layout{grid-template-columns:minmax(0,1fr)}}
+.stage{min-width:0}
+.frame{
+  position:relative;display:block;width:max-content;margin:0 auto;
+  border:4px solid var(--line);box-shadow:6px 6px 0 var(--line);background:#000;
+}
+canvas#cv{display:block;image-rendering:pixelated;image-rendering:-moz-crisp-edges;image-rendering:crisp-edges;image-rendering:pixelated;touch-action:none;cursor:crosshair}
+.hint{margin:18px auto 0;max-width:720px;color:var(--muted);text-align:center;line-height:1.9}
+
+.toast{
+  position:absolute;left:50%;bottom:12px;transform:translateX(-50%);
+  background:var(--panel);color:var(--ink);border:3px solid var(--line);padding:7px 12px;
+  opacity:0;pointer-events:none;transition:opacity .18s;white-space:nowrap;max-width:94%;overflow:hidden;text-overflow:ellipsis
+}
+.toast.show{opacity:1}
+.result{position:absolute;inset:0;display:none;align-items:center;justify-content:center;background:rgba(8,16,12,.5);padding:12px}
+.result.show{display:flex}
+.card{background:var(--panel);border:4px solid var(--line);box-shadow:6px 6px 0 var(--line);padding:18px;text-align:center;max-width:100%}
+.card h3{margin:0 0 10px;font-size:16px;line-height:1.4;color:var(--accent)}
+.card p{margin:0 0 16px}
+.card .row{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+
+aside .panel,.dialog{background:var(--panel);border:3px solid var(--line);box-shadow:4px 4px 0 var(--line);padding:12px;margin-bottom:18px}
+.panel h2,.dialog h2{font-size:10px;margin:0 0 10px;color:var(--muted);font-weight:400}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.span2{grid-column:span 2}
+.terrain-btn{display:flex;align-items:center;gap:8px;text-align:left;padding:8px 8px}
+.chip{width:14px;height:14px;border:2px solid var(--line);flex:none}
+.dim{opacity:.45}
+.status{margin-top:12px;color:var(--muted);line-height:2}
+.status b{color:var(--ink);font-weight:400}
+.status .ok{color:var(--good)}
+.note{margin:10px 0 0;color:var(--muted);line-height:1.8;font-size:8px}
+.text{
+  width:100%;font:inherit;font-size:10px;color:var(--ink);background:var(--bg);
+  border:3px solid var(--line);padding:9px 8px;margin-bottom:12px;
+}
+textarea.text{height:120px;resize:vertical;word-break:break-word;line-height:1.5;margin-bottom:8px}
+input[type=range]{width:100%;accent-color:var(--accent);margin:4px 0 0}
+.stats{margin:0;display:grid;grid-template-columns:1fr 1fr;gap:12px 8px}
+.stats div{min-width:0}
+.stats dt{color:var(--muted);margin:0}
+.stats dd{margin:4px 0 0;font-size:12px}
+.course-title{font-size:11px;margin-bottom:12px;line-height:1.5;word-break:break-word}
+.meter{height:16px;border:3px solid var(--line);background:var(--bg);margin-bottom:8px}
+.meter div{height:100%;width:0;background:var(--good)}
+
+/* ---------- modal + reviews ---------- */
+.overlay{
+  position:fixed;inset:0;z-index:20;background:rgba(6,12,10,.6);display:flex;align-items:center;justify-content:center;
+  padding:calc(16px + env(safe-area-inset-top,0px)) 16px calc(16px + env(safe-area-inset-bottom,0px));
+}
+.dialog{width:min(480px,100%);max-height:100%;overflow:auto;margin:0}
+.dialog .mbody{margin-bottom:14px;line-height:1.8}
+.dialog .mbtns{display:flex;gap:10px;flex-wrap:wrap}
+.dialog select{margin-bottom:0}
+.saved-row{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+.saved-row span{flex:1;min-width:0;word-break:break-word}
+.muted{color:var(--muted)}
+.stars{display:flex;gap:6px;margin-bottom:10px;align-items:center}
+.stars .btn{padding:6px 8px;font-size:12px;box-shadow:0 3px 0 var(--line)}
+.review{border:3px solid var(--line);background:var(--bg);padding:10px;margin-bottom:10px}
+.review .rh{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:6px}
+.review .rs{color:var(--accent)}
+.review .rt{word-break:break-word;line-height:1.7;white-space:pre-wrap}
+.review .rd{color:var(--muted);font-size:8px;margin-top:6px}
+@media (prefers-reduced-motion:reduce){.toast,.cc{transition:none}}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- ================= MENU ================= -->
+  <section id="menu">
+    <div class="hero">
+      <canvas id="heroCv" width="320" height="80" aria-hidden="true"></canvas>
+      <div class="hero-text"><h1>Pixel Links</h1><span>Build a course. Share it. Play it.</span></div>
+    </div>
+    <div class="menu-bar">
+      <div class="tabs">
+        <button class="btn" id="tabCommunity">Community</button>
+        <button class="btn" id="tabDevice">On this device</button>
+      </div>
+      <div class="tabs">
+        <button class="btn primary" id="mNew">New course</button>
+        <button class="btn" id="mImport">Import code</button>
+        <button class="btn" id="mRefresh">Refresh</button>
+        <button class="btn sfx">Sound on</button>
+      </div>
+    </div>
+    <div class="conn" id="conn" role="status"></div>
+    <div class="cards" id="cards"></div>
+  </section>
+
+  <!-- ================= GAME ================= -->
+  <section id="game" hidden>
+    <div class="game-head">
+      <button class="btn" id="menuBtn">Menu</button>
+      <div class="game-title" id="gTitle"></div>
+      <div class="seg" id="roleSeg" role="group" aria-label="Role">
+        <button class="btn" data-role="editor">Editor</button>
+        <button class="btn" data-role="viewer">Viewer</button>
+      </div>
+      <div class="tabs" id="modeTabs">
+        <button class="btn" id="tabEdit">Edit</button>
+        <button class="btn" id="tabPlay">Play</button>
+      </div>
+      <button class="btn sfx">Sound on</button>
+    </div>
+
+    <div class="layout">
+      <main class="stage" id="stage">
+        <div class="frame" id="frame">
+          <canvas id="cv" width="240" height="150" aria-label="Golf course canvas"></canvas>
+          <div class="toast" id="toast" role="status"></div>
+          <div class="result" id="result"></div>
+        </div>
+        <p class="hint" id="hint"></p>
+      </main>
+
+      <aside>
+        <!-- EDIT -->
+        <div id="editPanel">
+          <button class="btn primary big" id="playBtn" style="margin-bottom:18px">Test play</button>
+
+          <div class="panel">
+            <h2>Tool</h2>
+            <div class="grid2">
+              <button class="btn" data-tool="brush">Brush</button>
+              <button class="btn" data-tool="fill">Fill</button>
+              <button class="btn" data-tool="tee">Tee spot</button>
+              <button class="btn" data-tool="hole">Hole</button>
+            </div>
+            <div class="status" id="status"></div>
+          </div>
+
+          <div class="panel">
+            <h2>Terrain</h2>
+            <div class="grid2" id="terrains"></div>
+            <p class="note">Void is out of bounds. The edge of your painted land becomes a bouncy wall.</p>
+            <h2 style="margin:14px 0 4px">Brush size <span id="sizeVal" style="color:var(--ink)"></span></h2>
+            <input type="range" id="size" min="1" max="20" value="6" aria-label="Brush size">
+          </div>
+
+          <div class="panel">
+            <h2>Height (changes speed)</h2>
+            <div class="grid2">
+              <button class="btn" data-tool="raise">Raise</button>
+              <button class="btn" data-tool="lower">Lower</button>
+              <button class="btn span2" data-tool="flat">Flatten</button>
+            </div>
+            <h2 style="margin:14px 0 4px">Step <span id="hstepVal" style="color:var(--ink)"></span></h2>
+            <input type="range" id="hstep" min="1" max="20" value="6" aria-label="Height step">
+            <button class="btn wide" id="edgeBtn" style="margin-top:12px">Edge: soft</button>
+            <p class="note">Balls roll faster downhill and slow down uphill. Right-click reverses raise and lower.</p>
+          </div>
+
+          <div class="panel">
+            <h2>Decorations</h2>
+            <div class="grid2" id="decos"></div>
+            <button class="btn wide" data-tool="undeco" style="margin-top:10px">Remove</button>
+            <p class="note">Click to place one. Dragging does not place more. Right-click also removes.</p>
+          </div>
+
+          <div class="panel">
+            <h2>Course</h2>
+            <input class="text" id="nameIn" maxlength="20" aria-label="Course name">
+            <div class="grid2">
+              <button class="btn" id="undoBtn">Undo</button>
+              <button class="btn" id="redoBtn">Redo</button>
+              <button class="btn span2" id="saveBtn">Save on device</button>
+              <button class="btn primary span2" id="pubBtn">Publish online</button>
+              <button class="btn span2" id="pubNewBtn" hidden>Publish as new</button>
+              <button class="btn span2" id="shareBtn">Share code</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- PLAY -->
+        <div id="playPanel" hidden>
+          <div class="panel">
+            <h2>Now playing</h2>
+            <div class="course-title" id="pName"></div>
+            <dl class="stats">
+              <div><dt>Par</dt><dd id="pPar">-</dd></div>
+              <div><dt>Strokes</dt><dd id="pStrokes">0</dd></div>
+              <div><dt>To hole</dt><dd id="pDist">-</dd></div>
+              <div><dt>Lie</dt><dd id="pLie">-</dd></div>
+            </dl>
+          </div>
+          <div class="panel">
+            <h2>Club</h2>
+            <div class="grid3" id="clubs">
+              <button class="btn sm" data-club="auto">Auto</button>
+              <button class="btn sm" data-club="driver">Wood</button>
+              <button class="btn sm" data-club="putter">Putter</button>
+            </div>
+            <h2 style="margin:14px 0 8px">Power <span id="powerTxt" style="color:var(--ink)"></span></h2>
+            <div class="meter"><div id="powerFill"></div></div>
+          </div>
+          <div class="grid2" style="margin-bottom:18px">
+            <button class="btn" id="restartBtn">Restart</button>
+            <button class="btn primary" id="reviewsBtn">Reviews</button>
+            <button class="btn span2" id="backBtn">Back to editing</button>
+          </div>
+        </div>
+      </aside>
+    </div>
+  </section>
+</div>
+<div id="modalRoot"></div>
+
+<script type="module">
+(() => {
+'use strict';
+/* ================================================================== *
+ *  CONSTANTS
+ * ================================================================== */
+const W = 240, H = 150;
+const T = { ROUGH:0, FAIRWAY:1, GREEN:2, SAND:3, WATER:4, TREE:5, VOID:6 };
+const TERRAINS = [
+  { id:0, name:'Rough',   color:'#3a7a3c' },
+  { id:1, name:'Fairway', color:'#6eb64f' },
+  { id:2, name:'Green',   color:'#86cc62' },
+  { id:3, name:'Sand',    color:'#e8d08e' },
+  { id:4, name:'Water',   color:'#3a78c8' },
+  { id:5, name:'Trees',   color:'#1e5430' },
+  { id:6, name:'Void (walls)', color:'#1a2622', wide:true },
+];
+// solid = footprint [x0,y0,x1,y1] relative to the deco's base point
+const DECOS = [
+  { name:'Windmill', solid:[-3,-2,3,0] },
+  { name:'Flag' },
+  { name:'Rock',     solid:[-2,-2,2,0] },
+  { name:'Bush' },
+  { name:'Bench' },
+  { name:'Flowers' },
+];
+const MAX_DECOS = 150;
+const LIE_NAMES = ['Rough','Fairway','Green','Sand','Water','Trees','Void'];
+const FRIC   = [0.935, 0.972, 0.978, 0.86, 0.9, 0.9, 0.9];
+const LAND   = [0.28, 0.42, 0.40, 0.03, 0, 0, 0];
+const LIE_PW = [0.85, 1, 1, 0.65, 1, 1, 1];
+const STATIC = [0.02, 0.014, 0.01, 0.045, 0, 0, 0];
+const TREE_H = 6, WALL_H = 5, DECO_H = 7;
+const SLOPE_K = 0.02;
+const HMAX = 60;
+const SINK_MAX_SPEED = 2.2;
+const K_COURSES = 'pixellinks:courses2', K_LEGACY = 'pixellinks:courses', K_COMMENTS = 'pixellinks:comments', K_NAME = 'pixellinks:player';
+const isHeightTool = t => t === 'raise' || t === 'lower' || t === 'flat';
+
+/* ================================================================== *
+ *  DOM + STATE
+ * ================================================================== */
+const $ = id => document.getElementById(id);
+const cv = $('cv');
+let ctx = cv.getContext('2d');
+const stage = $('stage');
+
+let terrain = new Uint8Array(W*H);
+const elev = new Int8Array(W*H);
+let decos = [];
+const decoSolid = new Uint8Array(W*H);
+let decoSorted = [];
+let tee = null, hole = null;
+let courseName = 'My course';
+let tool = 'brush', cur = 1, curDeco = 0, brushSize = 6, hstep = 6, hardEdge = false;
+let mode = 'edit', role = 'editor', screen = 'menu';
+let curCourse = { id:null, source:'new' };
+let changed = false;
+let dirty = true, lastHeat = false, noHeat = false;
+let hover = null, dragging = null, lastPt = null;
+let hBase = null, hW = null;
+let undoStack = [], redoStack = [];
+let modalOpen = false;
+
+const ball = { x:0, y:0, vx:0, vy:0, z:0, air:false, t:0, T:1, H:10, sink:0, holed:false, moving:false, lx:0, ly:0 };
+let strokes = 0, clubMode = 'auto', aim = null;
+const parts = [];
+
+/* ================================================================== *
+ *  UTIL
+ * ================================================================== */
+function hash(x, y){
+  let h = (Math.imul(x, 374761393) + Math.imul(y, 668265263)) | 0;
+  h = Math.imul(h ^ (h >>> 13), 1274126177);
+  return (h ^ (h >>> 16)) & 255;
+}
+const inb = (x, y) => x >= 0 && y >= 0 && x < W && y < H;
+const getT = (x, y) => { x = Math.floor(x); y = Math.floor(y); return inb(x, y) ? terrain[y*W+x] : -1; };
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const el = (tag, props = {}, text) => { const e = document.createElement(tag); Object.assign(e, props); if (text) e.textContent = text; return e; };
+const withTimeout = (p, ms) => Promise.race([p, new Promise((_, rej) => setTimeout(() => rej({ code:'timeout', message:'timeout' }), ms))]);
+function nearMarker(x, y){
+  for (const m of [tee, hole]) if (m && (x-m.x)*(x-m.x) + (y-m.y)*(y-m.y) < 16) return true;
+  return false;
+}
+const parOf = (t, h) => (!t || !h) ? null : (d => d < 90 ? 3 : d < 170 ? 4 : 5)(Math.hypot(t.x - h.x, t.y - h.y));
+const calcPar = () => parOf(tee, hole);
+let toastTimer = 0, noteTimer = 0;
+function toast(msg){
+  const e = $('toast'); e.textContent = msg; e.classList.add('show');
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => e.classList.remove('show'), 2200);
+}
+function notify(msg){
+  if (screen === 'game') { toast(msg); return; }
+  const c = $('conn'); c.textContent = msg; c.className = 'conn';
+  clearTimeout(noteTimer); noteTimer = setTimeout(renderConn, 3500);
+}
+
+/* ---- storage (localStorage with in-memory fallback) ---- */
+const memStore = {};
+function lsGet(k, d){ try { const s = localStorage.getItem(k); return s ? JSON.parse(s) : d; } catch (e) { return k in memStore ? memStore[k] : d; } }
+function lsSet(k, v){ try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch (e) { memStore[k] = v; return false; } }
+
+/* ================================================================== *
+ *  SOUND
+ * ================================================================== */
+let audio = null, sfxOn = true, lastBounce = 0;
+function beep(freq, dur, type = 'square', vol = 0.04, slide = 0, delay = 0){
+  if (!sfxOn) return;
+  try {
+    audio = audio || new (window.AudioContext || window.webkitAudioContext)();
+    const o = audio.createOscillator(), g = audio.createGain();
+    const t0 = audio.currentTime + delay;
+    o.type = type;
+    o.frequency.setValueAtTime(freq, t0);
+    if (slide) o.frequency.exponentialRampToValueAtTime(Math.max(30, freq + slide), t0 + dur);
+    g.gain.setValueAtTime(vol, t0);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    o.connect(g); g.connect(audio.destination);
+    o.start(t0); o.stop(t0 + dur + 0.03);
+  } catch (e) {}
+}
+const sfx = {
+  hit:    () => { beep(260, .09, 'square', .05, -140); beep(90, .12, 'triangle', .06, -30); },
+  splash: () => { beep(420, .35, 'triangle', .05, -340); },
+  oob:    () => { beep(220, .3, 'sawtooth', .03, -150); },
+  cup:    () => { beep(523, .12, 'square', .04); beep(659, .12, 'square', .04, 0, .1); beep(784, .22, 'square', .04, 0, .2); },
+  bounce: () => { const n = performance.now(); if (n - lastBounce < 70) return; lastBounce = n; beep(170, .05, 'square', .03, -70); },
+};
+
+/* ================================================================== *
+ *  PALETTE
+ * ================================================================== */
+const C = {
+  rough:[58,118,60], roughD:[47,102,52], roughL:[74,140,72], roughT:[90,154,80],
+  fair1:[102,172,78], fair2:[112,184,86], fairD:[90,156,70], fairL:[128,200,100],
+  green1:[134,206,100], green2:[126,198,94], greenL:[152,224,116],
+  sand:[232,208,142], sandD:[212,184,116], sandL:[246,228,172],
+  water1:[52,116,196], water2:[60,126,206],
+  edgeFair:[78,144,64], edgeGreen:[100,172,76], edgeSand:[190,158,92], foam:[172,216,246],
+  tree:[34,92,50], treeD:[28,80,44], treeL:[46,112,60],
+  rimTop:[102,174,90], rimLeft:[72,144,74], treeDark:[16,52,32], treeDot:[56,124,66],
+  wallTop:[224,192,134], wallFace:[168,124,78], wall2:[112,80,52],
+  void:[24,36,31], voidD:[17,27,24],
+};
+
+/* ================================================================== *
+ *  ELEVATION  (blurred height field -> slopes)
+ * ================================================================== */
+const hs = new Float32Array(W*H), tmpF = new Float32Array(W*H);
+const gxA = new Float32Array(W*H), gyA = new Float32Array(W*H);
+function computeSlopes(){
+  for (let i = 0; i < W*H; i++) hs[i] = elev[i];
+  for (let pass = 0; pass < 2; pass++){
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++){
+      const r = y*W;
+      tmpF[r+x] = (hs[r + Math.max(x-1, 0)] + hs[r+x] + hs[r + Math.min(x+1, W-1)]) / 3;
+    }
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++){
+      hs[y*W+x] = (tmpF[Math.max(y-1, 0)*W + x] + tmpF[y*W+x] + tmpF[Math.min(y+1, H-1)*W + x]) / 3;
+    }
+  }
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++){
+    const x0 = Math.max(x-1, 0), x1 = Math.min(x+1, W-1), y0 = Math.max(y-1, 0), y1 = Math.min(y+1, H-1);
+    gxA[y*W+x] = (hs[y*W+x1] - hs[y*W+x0]) / (x1 - x0);
+    gyA[y*W+x] = (hs[y1*W+x] - hs[y0*W+x]) / (y1 - y0);
+  }
+}
+function slopeMagAt(x, y){
+  const i = clamp(Math.floor(y), 0, H-1)*W + clamp(Math.floor(x), 0, W-1);
+  return SLOPE_K * Math.hypot(gxA[i], gyA[i]);
+}
+
+/* ================================================================== *
+ *  WALLS + SOLID DECORATIONS
+ *   wm: 0 open, 1 wall (touching land), 2 wall (outer), 3 deep void
+ * ================================================================== */
+const wm = new Uint8Array(W*H), wt = new Uint8Array(W*H);
+function computeWalls(){
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++){
+    const i = y*W + x;
+    wt[i] = (x < 2 || y < 2 || x >= W-2 || y >= H-2 || terrain[i] === T.VOID) ? 1 : 0;
+  }
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++){
+    const i = y*W + x;
+    if (!wt[i]){ wm[i] = 0; continue; }
+    const adj = (x > 0 && !wt[i-1]) || (x < W-1 && !wt[i+1]) || (y > 0 && !wt[i-W]) || (y < H-1 && !wt[i+W]);
+    wm[i] = adj ? 1 : 3;
+  }
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++){
+    const i = y*W + x;
+    if (wm[i] !== 3) continue;
+    if ((x > 0 && wm[i-1] === 1) || (x < W-1 && wm[i+1] === 1) || (y > 0 && wm[i-W] === 1) || (y < H-1 && wm[i+W] === 1)) wm[i] = 2;
+  }
+}
+function rebuildSolids(){
+  decoSolid.fill(0);
+  for (const d of decos){
+    const s = DECOS[d.t].solid;
+    if (!s) continue;
+    for (let y = d.y + s[1]; y <= d.y + s[3]; y++) for (let x = d.x + s[0]; x <= d.x + s[2]; x++) if (inb(x, y)) decoSolid[y*W+x] = 1;
+  }
+  decoSorted = decos.slice().sort((a, b) => a.y - b.y);
+}
+function blockH(x, y){
+  x = Math.floor(x); y = Math.floor(y);
+  if (x < 2 || y < 2 || x >= W-2 || y >= H-2) return WALL_H;
+  const i = y*W + x, t = terrain[i];
+  if (t === T.VOID) return WALL_H;
+  if (t === T.TREE) return TREE_H;
+  return decoSolid[i] ? DECO_H : 0;
+}
+let probeWall = false;
+const PROBE = [[0,0],[-1.2,0],[1.2,0],[0,-1.2],[0,1.2]];
+function probe(x, y){
+  probeWall = false; let h = 0;
+  for (const p of PROBE){
+    const hh = blockH(x + p[0], y + p[1]);
+    if (hh > h) h = hh;
+    if (hh === WALL_H) probeWall = true;
+  }
+  return h;
+}
+function contactNormal(x, y, air, z){
+  let nx = 0, ny = 0;
+  const cx = Math.floor(x), cy = Math.floor(y);
+  for (let dy = -3; dy <= 3; dy++) for (let dx = -3; dx <= 3; dx++){
+    const px = cx + dx, py = cy + dy, h = blockH(px, py);
+    if (!h || (air && z >= h)) continue;
+    const ox = x - (px + .5), oy = y - (py + .5), w = 1 / (ox*ox + oy*oy + .5);
+    nx += ox*w; ny += oy*w;
+  }
+  const l = Math.hypot(nx, ny);
+  return l > 1e-4 ? { x:nx/l, y:ny/l } : null;
+}
+
+/* ================================================================== *
+ *  STATIC TERRAIN RENDER
+ * ================================================================== */
+const base = new Uint8ClampedArray(W*H*4);
+const waterIdx = [];
+const imgData = new ImageData(W, H);
+const frameBuf = imgData.data;
+
+function buildBase(){
+  computeSlopes(); computeWalls();
+  waterIdx.length = 0;
+  const heat = isHeightTool(tool) && mode === 'edit' && role === 'editor' && screen === 'game' && !noHeat;
+  const trAt = (xx, yy) => xx >= 0 && yy >= 0 && xx < W && yy < H && wm[yy*W+xx] === 0 && terrain[yy*W+xx] === T.TREE;
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++){
+    const i = y*W + x, p = i*4, w = wm[i], h = hash(x, y);
+    if (w){
+      let c;
+      if (w === 1) c = (y < H-1 && wm[i+W] === 0) ? C.wallFace : C.wallTop;
+      else if (w === 2) c = C.wall2;
+      else c = h < 40 ? C.voidD : C.void;
+      base[p] = c[0]; base[p+1] = c[1]; base[p+2] = c[2]; base[p+3] = 255;
+      continue;
+    }
+    const t = terrain[i];
+    const nL = x > 0 ? terrain[i-1] : t, nR = x < W-1 ? terrain[i+1] : t;
+    const nU = y > 0 ? terrain[i-W] : t, nD = y < H-1 ? terrain[i+W] : t;
+    let c;
+    if (t === T.ROUGH){
+      c = h < 26 ? C.roughD : h > 232 ? C.roughL : (h >= 110 && h < 114) ? C.roughT : C.rough;
+    } else if (t === T.FAIRWAY){
+      c = (((x + y) >> 2) & 1) ? C.fair1 : C.fair2;
+      if (h < 18) c = C.fairD; else if (h > 242) c = C.fairL;
+      if (nL < t || nR < t || nU < t || nD < t) c = C.edgeFair;
+    } else if (t === T.GREEN){
+      c = ((x + y) & 1) ? C.green1 : C.green2;
+      if (h > 244) c = C.greenL;
+      if (nL < t || nR < t || nU < t || nD < t) c = C.edgeGreen;
+    } else if (t === T.SAND){
+      c = h < 36 ? C.sandD : h > 224 ? C.sandL : C.sand;
+      if (nL < t || nR < t || nU < t || nD < t) c = C.edgeSand;
+    } else if (t === T.WATER){
+      c = h < 128 ? C.water1 : C.water2;
+      const shore = n => n !== T.WATER && n !== T.TREE && n !== T.VOID;
+      if (shore(nL) || shore(nR) || shore(nU) || shore(nD)) c = C.foam;
+      else waterIdx.push(i);
+    } else { // TREE
+      if (!trAt(x, y-1)) c = C.rimTop;
+      else if (!trAt(x-1, y) || !trAt(x-1, y-1)) c = C.rimLeft;
+      else if (!trAt(x+1, y) || !trAt(x, y+1)) c = C.treeDark;
+      else {
+        c = h < 70 ? C.treeD : h > 200 ? C.treeL : C.tree;
+        if (((x*3 + y*7) % 5) === 0) c = C.treeDot;
+      }
+    }
+    let f = 1;
+    if (t !== T.TREE){
+      if (trAt(x-1, y-1) || trAt(x-2, y-1) || trAt(x-2, y-2)) f = 0.7;
+      else if ((x > 0 && wm[i-1] === 1) || (y > 0 && wm[i-W] === 1)) f = 0.8;
+    }
+    if (t !== T.WATER && t !== T.TREE){
+      const g = gxA[i] + gyA[i];
+      f *= 1 + clamp(g * 0.09, -0.32, 0.32);
+      f *= 1 + clamp(hs[i] * 0.004, -0.12, 0.16);
+      const q = Math.floor(hs[i] / 4);
+      if ((x < W-1 && Math.floor(hs[i+1] / 4) !== q) || (y < H-1 && Math.floor(hs[i+W] / 4) !== q)) f *= 1.09;
+    }
+    let r = c[0]*f, g2 = c[1]*f, b = c[2]*f;
+    if (heat){
+      const hv = hs[i], a = clamp(Math.abs(hv) / 24, 0, 0.55);
+      if (hv > 0.4){ r += (255 - r)*a; g2 += (150 - g2)*a; b += (60 - b)*a; }
+      else if (hv < -0.4){ r += (50 - r)*a; g2 += (120 - g2)*a; b += (255 - b)*a; }
+    }
+    base[p] = r; base[p+1] = g2; base[p+2] = b; base[p+3] = 255;
+  }
+}
+function ensureBuilt(){ if (dirty){ buildBase(); dirty = false; } }
+
+/* ================================================================== *
+ *  SPRITES  (drawn straight onto the low-res canvas => stay pixelated)
+ * ================================================================== */
+function rect(x, y, w, h, c){ ctx.fillStyle = c; ctx.fillRect(Math.floor(x), Math.floor(y), w, h); }
+
+function drawHole(m){
+  const x = m.x, y = m.y, c = '#0e150e';
+  rect(x-2, y-1, 5, 3, c); rect(x-1, y-2, 3, 1, c); rect(x-1, y+2, 3, 1, c);
+  rect(x-1, y+3, 3, 1, 'rgba(255,255,255,.22)');
+}
+function drawFlag(m, t){
+  const x = m.x, y = m.y;
+  rect(x+1, y-1, 3, 1, 'rgba(0,0,0,.28)');
+  rect(x, y-11, 1, 11, '#f6f3e8');
+  const w = 5 + (Math.floor(t / 260) % 2);
+  rect(x+1, y-11, w, 1, '#e8443a');
+  rect(x+1, y-10, w-1, 1, '#e8443a');
+  rect(x+1, y-9, w-2, 1, '#c22e2e');
+  rect(x+1, y-8, w-3, 1, '#c22e2e');
+}
+function drawTee(m, showBall){
+  const x = m.x, y = m.y;
+  rect(x-8, y-1, 2, 1, '#9db8ff'); rect(x-8, y, 2, 3, '#3b6be0');
+  rect(x+7, y-1, 2, 1, '#9db8ff'); rect(x+7, y, 2, 3, '#3b6be0');
+  rect(x, y+2, 1, 2, '#e2b464');
+  if (showBall) drawBallAt(x+.5, y+.5, 0, 1);
+}
+function drawBallAt(bx, by, z, s){
+  const x = Math.floor(bx), y = Math.floor(by);
+  if (s <= 0) return;
+  rect(x-1, y+1, 3, 1, 'rgba(0,0,0,.35)');
+  const yy = Math.floor(by - z*0.55);
+  if (s < 1){ rect(x, yy, 1, 1, '#fff'); return; }
+  rect(x-1, yy-1, 3, 3, '#ffffff');
+  rect(x+1, yy+1, 1, 1, '#b9c4d6');
+  rect(x, yy-1, 1, 1, '#ffffff');
+}
+
+/* ---- decorations (each anchored at its base point x,y) ---- */
+function drawDeco(d, now){
+  const x = d.x, y = d.y;
+  switch (d.t){
+    case 0: { // windmill
+      rect(x-5, y-1, 11, 2, 'rgba(0,0,0,.25)');
+      for (let i = 0; i < 10; i++){
+        const yy = y - 10 + i, hw = i < 3 ? 1 : i < 7 ? 2 : 3;
+        rect(x-hw, yy, hw*2+1, 1, (i % 3 === 2) ? '#dccfa8' : '#eee3c4');
+        rect(x+hw-1, yy, 2, 1, '#c8b88c');
+      }
+      rect(x-1, y-13, 3, 1, '#c8433a'); rect(x-2, y-12, 5, 1, '#c8433a'); rect(x-2, y-11, 5, 1, '#9a2f2c');
+      rect(x-1, y-3, 2, 3, '#5a3a26');
+      const cx = x, cy = y - 9, a0 = now * 0.0025;
+      for (let k = 0; k < 4; k++){
+        const a = a0 + k * Math.PI / 2, ca = Math.cos(a), sa = Math.sin(a);
+        for (let s = 2; s <= 8; s++){
+          const px = Math.round(cx + ca*s), py = Math.round(cy + sa*s);
+          rect(px, py, 1, 1, s > 4 ? '#f6efd8' : '#8a5a34');
+          if (s >= 5) rect(Math.round(cx + ca*s - sa), Math.round(cy + sa*s + ca), 1, 1, '#e2d6b4');
+        }
+      }
+      rect(cx-1, cy-1, 2, 2, '#3a2a20');
+      break;
+    }
+    case 1: { // flag
+      const cols = ['#e8443a', '#3b6be0', '#f2c230', '#8a3bd6'], col = cols[hash(x, y) & 3];
+      rect(x+1, y-1, 3, 1, 'rgba(0,0,0,.25)');
+      rect(x, y-10, 1, 10, '#d8d6cc'); rect(x, y-10, 1, 1, '#f2c230');
+      const w = 5 + (Math.floor(now / 300 + x) % 2);
+      rect(x+1, y-9, w, 1, col); rect(x+1, y-8, w-1, 1, col); rect(x+1, y-7, w-2, 1, col); rect(x+1, y-6, w-3, 1, col);
+      break;
+    }
+    case 2: { // rock
+      rect(x-3, y-1, 7, 2, 'rgba(0,0,0,.25)');
+      rect(x-1, y-4, 3, 1, '#9a9ca4');
+      rect(x-2, y-3, 5, 1, '#8a8c94'); rect(x-2, y-2, 5, 1, '#7a7c84');
+      rect(x-2, y-1, 5, 1, '#63656e'); rect(x-1, y, 3, 1, '#4e505a');
+      rect(x-1, y-3, 1, 1, '#c0c2c8'); rect(x, y-4, 1, 1, '#c0c2c8');
+      break;
+    }
+    case 3: { // bush
+      rect(x-3, y, 7, 1, 'rgba(0,0,0,.22)');
+      rect(x-1, y-4, 3, 1, '#4c9a58');
+      rect(x-2, y-3, 5, 1, '#3f8a4c'); rect(x-3, y-2, 7, 1, '#347a42');
+      rect(x-3, y-1, 7, 1, '#2a6a38'); rect(x-2, y, 5, 1, '#205a2e');
+      rect(x-1, y-3, 1, 1, '#7cc878'); rect(x+1, y-2, 1, 1, '#7cc878');
+      if (hash(x, y) & 1){ rect(x-2, y-1, 1, 1, '#e05a5a'); rect(x+2, y-2, 1, 1, '#e05a5a'); }
+      break;
+    }
+    case 4: { // bench
+      rect(x-5, y, 11, 1, 'rgba(0,0,0,.22)');
+      rect(x-4, y-5, 9, 1, '#a8703c'); rect(x-4, y-4, 9, 1, '#8c5a30');
+      rect(x-4, y-3, 9, 1, '#c48a4c');
+      rect(x-3, y-2, 1, 2, '#4e3320'); rect(x+3, y-2, 1, 2, '#4e3320');
+      break;
+    }
+    case 5: { // flowers
+      const spots = [[-3,0,'#f4f0e0'], [-1,-2,'#ffd23f'], [2,-1,'#e85a8a'], [3,1,'#f4f0e0'], [0,1,'#ffd23f'], [-2,2,'#c94a4a']];
+      for (const s of spots){ rect(x+s[0], y+s[1], 1, 1, s[2]); rect(x+s[0], y+s[1]+1, 1, 1, '#2f7a3a'); }
+      break;
+    }
+  }
+}
+function spawnBurst(x, y, n, colors, spd = 1.3, up = 1, size = 1){
+  for (let i = 0; i < n; i++){
+    const a = Math.random() * Math.PI * 2, s = Math.random() * spd;
+    parts.push({ x, y, vx:Math.cos(a)*s, vy:Math.sin(a)*s - Math.random()*up*1.3, life:20+Math.random()*22, c:colors[(Math.random()*colors.length)|0], s:size });
+  }
+}
+function stepParticles(){
+  for (let i = parts.length - 1; i >= 0; i--){
+    const p = parts[i]; p.x += p.vx; p.y += p.vy; p.vy += 0.07; p.life--;
+    if (p.life <= 0) parts.splice(i, 1);
+  }
+}
+
+function brushRR(){ const r = brushSize/2; return r*r + 0.5; }
+function drawBrushPreview(p){
+  const cx = Math.floor(p.x), cy = Math.floor(p.y), R = Math.ceil(brushSize/2) + 1, rr = brushRR();
+  const ins = (dx, dy) => dx*dx + dy*dy <= rr;
+  ctx.fillStyle = tool === 'raise' ? 'rgba(255,190,110,.9)' : tool === 'lower' ? 'rgba(140,195,255,.9)' : 'rgba(255,255,255,.75)';
+  for (let dy = -R; dy <= R; dy++) for (let dx = -R; dx <= R; dx++){
+    if (ins(dx, dy) && !(ins(dx-1, dy) && ins(dx+1, dy) && ins(dx, dy-1) && ins(dx, dy+1))) ctx.fillRect(cx+dx, cy+dy, 1, 1);
+  }
+}
+
+function maxDrag(){ const sf = cv.clientWidth / W || 1; return clamp(150 / sf, 28, 60); }
+function currentClub(){
+  if (clubMode !== 'auto') return clubMode;
+  return getT(ball.x, ball.y) === T.GREEN ? 'putter' : 'driver';
+}
+const carryOf = p => 14 + 110*p;
+
+function drawAim(){
+  if (!aim || !canAim()) return;
+  const dx = ball.x - aim.x, dy = ball.y - aim.y, d = Math.hypot(dx, dy);
+  if (d < 3) return;
+  const p = Math.min(1, d / maxDrag()), ux = dx/d, uy = dy/d;
+  const club = currentClub(), lie = clamp(getT(ball.x, ball.y), 0, 6);
+  let len;
+  if (club === 'driver') len = carryOf(p) * LIE_PW[lie];
+  else { const v = 0.35 + 2.05*p; len = Math.min(110, v / (1 - FRIC[lie]) * 0.9); }
+  ctx.fillStyle = `hsl(${Math.round(120 - 120*p)},85%,58%)`;
+  for (let s = 5; s <= len; s += 4) ctx.fillRect(Math.floor(ball.x + ux*s), Math.floor(ball.y + uy*s), 2, 2);
+  const ex = Math.floor(ball.x + ux*len), ey = Math.floor(ball.y + uy*len);
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(ex-2, ey, 5, 1); ctx.fillRect(ex, ey-2, 1, 5);
+  ctx.fillStyle = 'rgba(255,255,255,.4)';
+  const bl = Math.min(d, maxDrag());
+  for (let s = 4; s <= bl; s += 3) ctx.fillRect(Math.floor(ball.x - ux*s), Math.floor(ball.y - uy*s), 1, 1);
+}
+
+/* ================================================================== *
+ *  RENDER
+ * ================================================================== */
+function drawStaticSprites(now){
+  if (hole) drawHole(hole);
+  if (tee) drawTee(tee, true);
+  for (const d of decoSorted) drawDeco(d, now);
+  if (hole) drawFlag(hole, now);
+}
+function render(now){
+  ensureBuilt();
+  frameBuf.set(base);
+  const ph = now * 0.001;
+  for (let k = 0; k < waterIdx.length; k++){
+    const i = waterIdx[k], x = i % W, y = (i / W) | 0;
+    const w = Math.sin(y*0.8 + x*0.18 + ph*4) + Math.sin(x*0.5 - ph*2)*0.4;
+    const p = i*4;
+    if (w > 1.08){ frameBuf[p] = 132; frameBuf[p+1] = 186; frameBuf[p+2] = 240; }
+    else if (w < -1.25){ frameBuf[p] = 40; frameBuf[p+1] = 96; frameBuf[p+2] = 176; }
+  }
+  ctx.putImageData(imgData, 0, 0);
+
+  if (mode === 'edit' && role === 'editor'){
+    drawStaticSprites(now);
+    if (hover){
+      const hx = Math.floor(hover.x), hy = Math.floor(hover.y);
+      if (tool === 'brush' || isHeightTool(tool)) drawBrushPreview(hover);
+      else if (tool === 'fill'){ ctx.fillStyle = '#fff'; ctx.fillRect(hx-3, hy, 7, 1); ctx.fillRect(hx, hy-3, 1, 7); }
+      else if (tool === 'tee'){ ctx.globalAlpha = .6; drawTee({ x:hx, y:hy }, true); ctx.globalAlpha = 1; }
+      else if (tool === 'hole'){ ctx.globalAlpha = .6; const m = { x:hx, y:hy }; drawHole(m); drawFlag(m, now); ctx.globalAlpha = 1; }
+      else if (tool === 'deco'){ ctx.globalAlpha = .6; drawDeco({ t:curDeco, x:hx, y:hy }, now); ctx.globalAlpha = 1; }
+      else if (tool === 'undeco'){ ctx.fillStyle = '#ff5a4a'; ctx.fillRect(hx-3, hy, 7, 1); ctx.fillRect(hx, hy-3, 1, 7); }
+    }
+  } else {
+    if (hole) drawHole(hole);
+    if (tee && strokes === 0 && !ball.moving) drawTee(tee, false);
+    const below = [];
+    for (const d of decoSorted){ if (d.y <= ball.y) drawDeco(d, now); else below.push(d); }
+    if (!ball.holed){
+      let bx = ball.x, by = ball.y, s = 1;
+      if (ball.sink > 0){
+        const k = Math.min(1, ball.sink / 10);
+        bx = ball.x + (hole.x + .5 - ball.x)*k; by = ball.y + (hole.y + .5 - ball.y)*k;
+        s = ball.sink > 8 ? 0 : 0.5;
+      }
+      drawBallAt(bx, by, ball.z, s);
+    }
+    for (const d of below) drawDeco(d, now);
+    if (hole) drawFlag(hole, now);
+    drawAim();
+  }
+  for (const p of parts){ ctx.fillStyle = p.c; ctx.fillRect(Math.floor(p.x), Math.floor(p.y), p.s, p.s); }
+}
+
+/* ================================================================== *
+ *  EDITING
+ * ================================================================== */
+const snapshot = () => ({ t:terrain.slice(), e:elev.slice(), tee:tee && {...tee}, hole:hole && {...hole}, d:decos.map(d => ({...d})) });
+function restoreSnap(s){ terrain = s.t.slice(); elev.set(s.e); tee = s.tee && {...s.tee}; hole = s.hole && {...s.hole}; decos = s.d.map(d => ({...d})); rebuildSolids(); dirty = true; }
+function pushUndo(){ undoStack.push(snapshot()); if (undoStack.length > 40) undoStack.shift(); redoStack.length = 0; changed = true; syncUI(); }
+function undo(){ if (!undoStack.length) return; redoStack.push(snapshot()); restoreSnap(undoStack.pop()); changed = true; syncUI(); }
+function redo(){ if (!redoStack.length) return; undoStack.push(snapshot()); restoreSnap(redoStack.pop()); changed = true; syncUI(); }
+
+function paintPx(x, y, t){
+  if (!inb(x, y)) return;
+  if ((t === T.WATER || t === T.TREE || t === T.VOID) && nearMarker(x, y)) return;
+  terrain[y*W + x] = t;
+}
+function stamp(cx, cy, t){
+  const r = brushSize/2, rr = brushRR(), R = Math.ceil(r);
+  for (let dy = -R; dy <= R; dy++) for (let dx = -R; dx <= R; dx++){
+    const d2 = dx*dx + dy*dy;
+    if (d2 > rr) continue;
+    if (t === T.TREE && brushSize >= 4 && d2 > rr*0.55 && hash(cx+dx, cy+dy) < 55) continue;
+    paintPx(cx+dx, cy+dy, t);
+  }
+  dirty = true;
+}
+function strokeLine(a, b, fn){
+  const n = Math.max(Math.abs(b.x - a.x), Math.abs(b.y - a.y), 1);
+  for (let i = 0; i <= n; i++) fn(Math.round(a.x + (b.x - a.x)*i/n), Math.round(a.y + (b.y - a.y)*i/n));
+}
+function heightStamp(cx, cy, sign){
+  const r = brushSize/2 + 0.6, R = Math.ceil(r);
+  for (let dy = -R; dy <= R; dy++) for (let dx = -R; dx <= R; dx++){
+    const d = Math.hypot(dx, dy);
+    if (d > r) continue;
+    const x = cx + dx, y = cy + dy;
+    if (!inb(x, y)) continue;
+    const w = hardEdge ? 1 : 0.5 * (1 + Math.cos(Math.PI * d / r)), i = y*W + x;
+    if (w <= hW[i]) continue;
+    hW[i] = w;
+    if (tool === 'flat') elev[i] = Math.round(hBase[i] * (1 - w));
+    else elev[i] = clamp(Math.round(hBase[i] + (tool === 'raise' ? 1 : -1) * sign * hstep * w), -HMAX, HMAX);
+  }
+  dirty = true;
+}
+function floodFill(x0, y0, t){
+  if (!inb(x0, y0)) return;
+  const target = terrain[y0*W + x0];
+  if (target === t) return;
+  const stack = [y0*W + x0];
+  while (stack.length){
+    const i = stack.pop();
+    if (terrain[i] !== target) continue;
+    const x = i % W, y = (i / W) | 0;
+    if ((t === T.WATER || t === T.TREE || t === T.VOID) && nearMarker(x, y)) continue;
+    terrain[i] = t;
+    if (x > 0) stack.push(i-1);
+    if (x < W-1) stack.push(i+1);
+    if (y > 0) stack.push(i-W);
+    if (y < H-1) stack.push(i+W);
+  }
+  dirty = true;
+}
+function clearAround(m){
+  for (let dy = -4; dy <= 4; dy++) for (let dx = -4; dx <= 4; dx++){
+    const x = m.x + dx, y = m.y + dy;
+    if (!inb(x, y) || dx*dx + dy*dy > 16) continue;
+    const t = terrain[y*W+x];
+    if (t === T.WATER || t === T.TREE || t === T.VOID) terrain[y*W+x] = 0;
+  }
+  // solid decorations too close to a marker get removed
+  decos = decos.filter(d => !(DECOS[d.t].solid && Math.hypot(d.x - m.x, d.y - m.y) < 8));
+  rebuildSolids();
+  dirty = true;
+}
+function placeMarker(kind, p){
+  const m = { x: clamp(Math.floor(p.x), 4, W-5), y: clamp(Math.floor(p.y), 12, H-5) };
+  if (kind === 'tee') tee = m; else hole = m;
+  clearAround(m);
+  syncUI();
+}
+/* one click = one decoration (never painted by dragging) */
+function placeDeco(p){
+  const x = Math.floor(p.x), y = Math.floor(p.y), def = DECOS[curDeco];
+  if (decos.length >= MAX_DECOS){ toast('That is plenty of decorations!'); return; }
+  if (x < 4 || y < 10 || x >= W-4 || y >= H-3){ toast("Can't place it there"); return; }
+  const t = terrain[y*W + x];
+  if (t === T.VOID || t === T.WATER){ toast('Place it on land'); return; }
+  if (def.solid && [tee, hole].some(m => m && Math.hypot(m.x - x, m.y - y) < 8)){ toast('Too close to the tee or hole'); return; }
+  if (decos.some(d => Math.hypot(d.x - x, d.y - y) < 5)){ toast('Something is already there'); return; }
+  pushUndo(); decos.push({ t:curDeco, x, y }); rebuildSolids();
+}
+function removeDecoAt(p){
+  let best = -1, bd = 7;
+  decos.forEach((d, i) => {
+    const dist = Math.min(Math.hypot(d.x - p.x, d.y - p.y), Math.hypot(d.x - p.x, d.y - 5 - p.y));
+    if (dist < bd){ bd = dist; best = i; }
+  });
+  if (best < 0){ toast('No decoration there'); return; }
+  pushUndo(); decos.splice(best, 1); rebuildSolids();
+}
+function newCourse(name, fill){
+  terrain = new Uint8Array(W*H); terrain.fill(fill); elev.fill(0); decos = []; rebuildSolids();
+  tee = null; hole = null; courseName = name || 'My course';
+  undoStack = []; redoStack = []; changed = false; dirty = true;
+}
+
+/* ---- demo course ---- */
+function buildDemo(){
+  terrain = new Uint8Array(W*H); terrain.fill(T.VOID); elev.fill(0); decos = [];
+  tee = { x:26, y:116 }; hole = { x:206, y:38 };
+  const disc = (cx, cy, r, t) => {
+    for (let y = Math.floor(cy - r - 1); y <= cy + r + 1; y++) for (let x = Math.floor(cx - r - 1); x <= cx + r + 1; x++){
+      const d2 = (x-cx)*(x-cx) + (y-cy)*(y-cy);
+      if (d2 > r*r) continue;
+      if (t === T.TREE && r >= 4 && d2 > r*r*0.55 && hash(x, y) < 55) continue;
+      if (inb(x, y)) terrain[y*W+x] = t;
+    }
+  };
+  const path = (pts, r, t) => {
+    for (let i = 0; i < pts.length - 1; i++){
+      const [a, b] = [pts[i], pts[i+1]], n = Math.ceil(Math.hypot(b[0]-a[0], b[1]-a[1]));
+      for (let k = 0; k <= n; k++) disc(a[0] + (b[0]-a[0])*k/n, a[1] + (b[1]-a[1])*k/n, r, t);
+    }
+  };
+  const bump = (cx, cy, r, amt) => {
+    for (let y = Math.floor(cy - r); y <= cy + r; y++) for (let x = Math.floor(cx - r); x <= cx + r; x++){
+      const d = Math.hypot(x - cx, y - cy);
+      if (d >= r || !inb(x, y)) continue;
+      const i = y*W + x;
+      elev[i] = clamp(elev[i] + Math.round(amt * 0.5 * (1 + Math.cos(Math.PI * d / r))), -HMAX, HMAX);
+    }
+  };
+  const fw = [[26,116],[58,110],[92,98],[124,91],[152,78],[178,58],[204,42]];
+  path(fw, 24, T.ROUGH);
+  [[140,110,22],[178,30,22],[60,84,16],[220,64,14]].forEach(a => disc(a[0], a[1], a[2], T.ROUGH));
+  path(fw, 8, T.FAIRWAY);
+  disc(118, 92, 11, T.FAIRWAY); disc(26, 116, 7, T.FAIRWAY);
+  disc(206, 38, 13, T.GREEN);
+  [[190,54,6],[222,52,5],[196,22,5],[106,106,6]].forEach(a => disc(a[0], a[1], a[2], T.SAND));
+  [[138,114,13],[154,120,10],[126,120,7],[166,26,9],[176,20,7]].forEach(a => disc(a[0], a[1], a[2], T.WATER));
+  [[60,84,5],[50,90,4],[70,76,4],[86,80,4],[104,78,4],[128,70,5],[148,60,5],[166,92,5],[182,76,5],[204,64,4],
+   [10,100,4],[14,128,5],[40,132,6],[58,124,4],[100,122,4],[168,44,4],[190,14,4]]
+    .forEach(a => disc(a[0], a[1], a[2], T.TREE));
+  bump(144, 62, 13, 14); bump(190, 74, 10, -9); bump(216, 28, 12, 7); bump(70, 102, 12, -8);
+  decos = [
+    { t:0, x:158, y:56 }, { t:1, x:36, y:124 }, { t:1, x:200, y:66 }, { t:1, x:96, y:112 },
+    { t:2, x:120, y:74 }, { t:2, x:214, y:72 }, { t:2, x:80, y:92 },
+    { t:3, x:46, y:104 }, { t:3, x:188, y:38 }, { t:3, x:232, y:70 },
+    { t:4, x:38, y:104 }, { t:5, x:62, y:96 }, { t:5, x:110, y:80 }, { t:5, x:186, y:20 }, { t:5, x:214, y:52 },
+  ];
+  rebuildSolids();
+  courseName = 'Demo hills'; dirty = true; undoStack = []; redoStack = [];
+}
+
+/* ================================================================== *
+ *  COURSE DATA  (serialize / load / thumbnails)
+ * ================================================================== */
+function rleEnc(a){
+  const out = []; let c = a[0], n = 0;
+  for (let i = 0; i < a.length; i++){ if (a[i] === c) n++; else { out.push(c, n); c = a[i]; n = 1; } }
+  out.push(c, n); return out;
+}
+function rleDec(r, Ty, lo, hi){
+  const t = new Ty(W*H); let p = 0;
+  for (let i = 0; i < r.length; i += 2){
+    const v = r[i], n = r[i+1];
+    if (!Number.isInteger(v) || v < lo || v > hi || !(n >= 0)) throw new Error('bad');
+    for (let k = 0; k < n && p < t.length; k++) t[p++] = v;
+  }
+  return t;
+}
+const serialize = () => ({ v:3, name:courseName, w:W, h:H, tee, hole, rle:rleEnc(terrain), erle:rleEnc(elev), decos:decos.map(d => [d.t, d.x, d.y]) });
+function applyData(o){
+  if (!o || !Array.isArray(o.rle) || o.w !== W || o.h !== H) throw new Error('bad');
+  const t = rleDec(o.rle, Uint8Array, 0, 6);
+  const e = Array.isArray(o.erle) ? rleDec(o.erle, Int8Array, -HMAX, HMAX) : new Int8Array(W*H);
+  const ok = m => m && Number.isFinite(m.x) && Number.isFinite(m.y) ? { x:clamp(m.x|0, 0, W-1), y:clamp(m.y|0, 0, H-1) } : null;
+  const ds = [];
+  if (Array.isArray(o.decos)) for (const a of o.decos.slice(0, MAX_DECOS)){
+    if (Array.isArray(a) && Number.isInteger(a[0]) && a[0] >= 0 && a[0] < DECOS.length && Number.isFinite(a[1]) && Number.isFinite(a[2])) ds.push({ t:a[0], x:clamp(a[1]|0, 0, W-1), y:clamp(a[2]|0, 0, H-1) });
+  }
+  terrain = t; elev.set(e); tee = ok(o.tee); hole = ok(o.hole); decos = ds; rebuildSolids();
+  courseName = String(o.name || 'My course').slice(0, 20); dirty = true;
+}
+function loadData(o){ applyData(o); undoStack = []; redoStack = []; changed = false; syncUI(); }
+const parOfData = o => o ? parOf(o.tee, o.hole) : null;
+
+function saveWorld(){ return { t:terrain, e:elev.slice(), tee, hole, decos, name:courseName, us:undoStack, rs:redoStack }; }
+function restoreWorld(s){ terrain = s.t; elev.set(s.e); tee = s.tee; hole = s.hole; decos = s.decos; courseName = s.name; undoStack = s.us; redoStack = s.rs; rebuildSolids(); dirty = true; }
+function withCourse(obj, fn){
+  const s = saveWorld(); noHeat = true;
+  try { applyData(obj); ensureBuilt(); return fn(); }
+  finally { noHeat = false; restoreWorld(s); }
+}
+const tcv = document.createElement('canvas'); tcv.width = W; tcv.height = H;
+const tctx = tcv.getContext('2d');
+function thumbOf(obj){
+  return withCourse(obj, () => {
+    frameBuf.set(base); tctx.putImageData(imgData, 0, 0);
+    const prev = ctx; ctx = tctx;
+    try { drawStaticSprites(700); } finally { ctx = prev; }
+    return tcv.toDataURL('image/jpeg', 0.72);
+  });
+}
+let demoCache = null;
+function getDemoData(){
+  if (!demoCache){ const s = saveWorld(); try { buildDemo(); demoCache = serialize(); } finally { restoreWorld(s); } }
+  return demoCache;
+}
+const encodeCode = () => btoa(unescape(encodeURIComponent(JSON.stringify(serialize()))));
+const decodeCode = s => JSON.parse(decodeURIComponent(escape(atob(s.trim()))));
+
+/* ================================================================== *
+ *  FIREBASE  (shared courses + reviews, no accounts). Falls back to
+ *  this-device-only storage if the SDK can't be reached.
+ * ================================================================== */
+const firebaseConfig = {
+  apiKey: "AIzaSyB98iP-Eo2Vo8mkA2_FwDGQf7WUIDs1cqU",
+  authDomain: "golf-f8c09.firebaseapp.com",
+  projectId: "golf-f8c09",
+  storageBucket: "golf-f8c09.firebasestorage.app",
+  messagingSenderId: "680032084822",
+  appId: "1:680032084822:web:ce9c2ee75cff66d9822cf7",
+  measurementId: "G-Y60P3LHLEM"
+};
+const FB_VER = '10.14.1';
+let fbPromise = null, fbState = 'connecting', pubBusy = false;
+function getFB(){
+  if (!fbPromise){
+    fbPromise = (async () => {
+      const root = 'https://www.gstatic.com/firebasejs/' + FB_VER + '/';
+      const [appM, fs] = await Promise.all([import(root + 'firebase-app.js'), import(root + 'firebase-firestore.js')]);
+      const app = appM.initializeApp(firebaseConfig);
+      import(root + 'firebase-analytics.js').then(async an => { if (await an.isSupported()) an.getAnalytics(app); }).catch(() => {});
+      return { fs, db: fs.getFirestore(app) };
+    })().catch(e => { fbPromise = null; throw e; });
+  }
+  return fbPromise;
+}
+function fbError(e){
+  const c = (e && e.code) || '', m = String((e && e.message) || '');
+  if (c === 'permission-denied') return 'Firestore rules are blocking this. Check the setup steps.';
+  if (c === 'failed-precondition') return 'Firestore is not set up yet, or it needs an index.';
+  if (c === 'timeout' || c === 'unavailable' || /fetch|network|Failed to load|import|module/i.test(m)) return 'Could not reach Firebase. Check your connection.';
+  return 'Something went wrong. Try again.';
+}
+
+/* ---- community list ---- */
+let communityList = null, commState = { status:'idle' };
+async function loadCommunity(){
+  commState = { status:'loading' }; renderMenu();
+  try {
+    const { fs, db } = await withTimeout(getFB(), 10000);
+    const snap = await withTimeout(fs.getDocs(fs.query(fs.collection(db, 'courses'), fs.orderBy('updatedAt', 'desc'), fs.limit(40))), 15000);
+    communityList = [];
+    snap.forEach(d => {
+      const v = d.data();
+      if (typeof v.name !== 'string') return;
+      communityList.push({
+        id:d.id, source:'online', name:v.name.slice(0, 20), par:[3, 4, 5].includes(v.par) ? v.par : null,
+        thumb:(typeof v.thumb === 'string' && v.thumb.startsWith('data:image/jpeg;base64,')) ? v.thumb : '',
+      });
+    });
+    commState = { status:'ok' };
+  } catch (e) { console.error(e); commState = { status:'error', msg:fbError(e) }; }
+  renderMenu();
+}
+async function fetchOnlineData(id){
+  const { fs, db } = await withTimeout(getFB(), 10000);
+  const snap = await withTimeout(fs.getDoc(fs.doc(db, 'courseData', id)), 15000);
+  if (!snap.exists()) throw new Error('missing');
+  return JSON.parse(snap.data().data);
+}
+async function publishOnline(asNew){
+  if (pubBusy) return;
+  if (!tee || !hole){ toast('Place a tee spot and a hole first'); return; }
+  if (fbState === 'fail'){ toast('Online sharing is only in the hosted version'); return; }
+  pubBusy = true; syncUI();
+  courseName = ($('nameIn').value.trim() || 'My course').slice(0, 20);
+  toast('Sharing...');
+  try {
+    const { fs, db } = await withTimeout(getFB(), 10000);
+    const data = serialize(), thumb = thumbOf(data), par = calcPar();
+    const update = curCourse.source === 'online' && !asNew;
+    const cref = update ? fs.doc(db, 'courses', curCourse.id) : fs.doc(fs.collection(db, 'courses'));
+    const batch = fs.writeBatch(db);
+    if (update) batch.update(cref, { name:courseName, par, thumb, updatedAt:fs.serverTimestamp() });
+    else batch.set(cref, { name:courseName, par, thumb, createdAt:fs.serverTimestamp(), updatedAt:fs.serverTimestamp() });
+    batch.set(fs.doc(db, 'courseData', cref.id), { data:JSON.stringify(data) });
+    await withTimeout(batch.commit(), 20000);
+    curCourse = { id:cref.id, source:'online' }; changed = false; communityList = null;
+    toast(update ? 'Updated for everyone!' : 'Shared! Everyone can find it');
+  } catch (e) { console.error(e); toast(fbError(e)); }
+  pubBusy = false; syncUI();
+}
+
+/* ---- reviews (comments) ---- */
+async function listComments(){
+  const out = [];
+  if (curCourse.source === 'online'){
+    const { fs, db } = await withTimeout(getFB(), 10000);
+    const snap = await withTimeout(fs.getDocs(fs.query(fs.collection(db, 'courses', curCourse.id, 'comments'), fs.orderBy('createdAt', 'desc'), fs.limit(50))), 15000);
+    snap.forEach(d => {
+      const v = d.data();
+      out.push({ id:d.id, name:String(v.name || 'Anonymous').slice(0, 20), text:String(v.text || '').slice(0, 300), rating:clamp(+v.rating || 0, 0, 5),
+        ts:(v.createdAt && v.createdAt.toMillis) ? v.createdAt.toMillis() : Date.now() });
+    });
+    return out;
+  }
+  return (lsGet(K_COMMENTS, {})[curCourse.id] || []).slice().sort((a, b) => b.ts - a.ts);
+}
+async function addComment(c){
+  if (curCourse.source === 'online'){
+    const { fs, db } = await withTimeout(getFB(), 10000);
+    await withTimeout(fs.addDoc(fs.collection(db, 'courses', curCourse.id, 'comments'), { name:c.name, text:c.text, rating:c.rating, createdAt:fs.serverTimestamp() }), 15000);
+    return;
+  }
+  const all = lsGet(K_COMMENTS, {});
+  (all[curCourse.id] = all[curCourse.id] || []).push({ id:'c' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), ...c, ts:Date.now() });
+  lsSet(K_COMMENTS, all);
+}
+async function deleteComment(id){
+  if (curCourse.source === 'online'){
+    const { fs, db } = await withTimeout(getFB(), 10000);
+    await withTimeout(fs.deleteDoc(fs.doc(db, 'courses', curCourse.id, 'comments', id)), 15000);
+    return;
+  }
+  const all = lsGet(K_COMMENTS, {});
+  all[curCourse.id] = (all[curCourse.id] || []).filter(c => c.id !== id);
+  lsSet(K_COMMENTS, all);
+}
+
+/* ================================================================== *
+ *  MODALS
+ * ================================================================== */
+function modal(title, bodyEl, buttons){
+  const root = $('modalRoot');
+  root.innerHTML = '';
+  const ov = el('div', { className:'overlay' }), dlg = el('div', { className:'dialog' });
+  const body = el('div', { className:'mbody' }); body.appendChild(bodyEl);
+  const btns = el('div', { className:'mbtns' });
+  const close = () => { root.innerHTML = ''; modalOpen = false; };
+  buttons.forEach(b => {
+    const bt = el('button', { className:'btn ' + (b.cls || '') }, b.label);
+    bt.onclick = () => { const keep = b.fn && b.fn(); if (keep !== true) close(); };
+    btns.appendChild(bt);
+  });
+  dlg.append(el('h2', {}, title), body, btns); ov.appendChild(dlg); root.appendChild(ov);
+  ov.addEventListener('pointerdown', e => { if (e.target === ov) close(); });
+  modalOpen = true;
+  const first = dlg.querySelector('input,textarea,select'); if (first) first.focus();
+  return close;
+}
+function confirmModal(title, text, yes, fn){
+  const b = el('div'); b.appendChild(el('p', {}, text));
+  modal(title, b, [{ label:yes, cls:'primary', fn }, { label:'Cancel' }]);
+}
+function openNew(){
+  const box = el('div');
+  const name = el('input', { className:'text', maxLength:20, value:'My course' });
+  const sel = el('select', { className:'text' });
+  [['Empty (draw your land)', 6], ['Grass field', 0], ['Island (water)', 4], ['Desert (sand)', 3]].forEach(([l, v]) => sel.appendChild(el('option', { value:v }, l)));
+  box.append(name, sel);
+  modal('New course', box, [
+    { label:'Create', cls:'primary', fn:() => {
+        newCourse(name.value.trim() || 'My course', +sel.value);
+        curCourse = { id:null, source:'new' }; role = 'editor'; mode = 'edit';
+        showGame(); toast('New course ready. Paint away!');
+    } },
+    { label:'Cancel' },
+  ]);
+}
+function openImport(){
+  const box = el('div');
+  box.appendChild(el('p', {}, 'Paste a course code someone shared with you.'));
+  const ta = el('textarea', { className:'text' }); const msg = el('div', { className:'muted' });
+  box.append(ta, msg);
+  modal('Import a course', box, [
+    { label:'Load code', cls:'primary', fn:() => {
+        try { loadData(decodeCode(ta.value)); curCourse = { id:null, source:'new' }; role = 'editor'; mode = 'edit'; showGame(); toast('Course imported'); return false; }
+        catch (e) { msg.textContent = 'That code did not work. Check you copied all of it.'; return true; }
+    } },
+    { label:'Cancel' },
+  ]);
+}
+function openShare(){
+  const box = el('div');
+  box.appendChild(el('p', {}, 'Copy this code to share the course with anyone. They can paste it in Import code on the menu.'));
+  const ta = el('textarea', { className:'text', value:encodeCode() }); const msg = el('div', { className:'muted' });
+  box.append(ta, msg);
+  modal('Share code', box, [
+    { label:'Copy', cls:'primary', fn:() => {
+        ta.select();
+        let ok = false;
+        try { ok = document.execCommand('copy'); } catch (e) {}
+        if (!ok && navigator.clipboard) navigator.clipboard.writeText(ta.value).then(() => { msg.textContent = 'Copied.'; }, () => { msg.textContent = 'Press Ctrl+C to copy.'; });
+        else msg.textContent = ok ? 'Copied.' : 'Press Ctrl+C to copy.';
+        return true;
+    } },
+    { label:'Close' },
+  ]);
+}
+function openReviews(){
+  if (!curCourse.id){ toast('Save or publish this course first, then it can have reviews'); return; }
+  const box = el('div');
+  const where = curCourse.source === 'online' ? 'Shared with everyone.' : 'Saved on this device only.';
+  box.appendChild(el('p', { className:'muted' }, where));
+  const summary = el('p', {}), list = el('div');
+  const name = el('input', { className:'text', maxLength:20, placeholder:'Your name', value:lsGet(K_NAME, '') });
+  const stars = el('div', { className:'stars' });
+  let rating = 0;
+  const starBtns = [1, 2, 3, 4, 5].map(n => {
+    const b = el('button', { className:'btn', type:'button', title:n + ' stars' }, '★');
+    b.onclick = () => { rating = rating === n ? 0 : n; paintStars(); };
+    stars.appendChild(b); return b;
+  });
+  const paintStars = () => starBtns.forEach((b, i) => b.classList.toggle('on', i < rating));
+  const text = el('textarea', { className:'text', maxLength:300, placeholder:'Write a review (optional if you give stars)' });
+  const msg = el('div', { className:'muted' });
+  box.append(summary, list, el('p', { className:'muted' }, 'Leave a review'), name, stars, text, msg);
+  const stars5 = n => '★'.repeat(n) + '☆'.repeat(5 - n);
+  async function refresh(){
+    list.innerHTML = ''; list.appendChild(el('p', { className:'muted' }, 'Loading...'));
+    try {
+      const items = await listComments();
+      list.innerHTML = '';
+      const rated = items.filter(c => c.rating > 0);
+      summary.textContent = items.length
+        ? items.length + (items.length === 1 ? ' review' : ' reviews') + (rated.length ? ', average ' + (rated.reduce((s, c) => s + c.rating, 0) / rated.length).toFixed(1) + ' of 5' : '')
+        : 'No reviews yet. Be the first!';
+      items.forEach(c => {
+        const r = el('div', { className:'review' });
+        const head = el('div', { className:'rh' });
+        head.append(el('span', {}, c.name), el('span', { className:'rs' }, c.rating ? stars5(c.rating) : ''));
+        r.append(head);
+        if (c.text) r.append(el('div', { className:'rt' }, c.text));
+        r.append(el('div', { className:'rd' }, new Date(c.ts).toLocaleDateString()));
+        if (role === 'editor'){
+          const del = el('button', { className:'btn sm', style:'margin-top:8px' }, 'Delete');
+          del.onclick = async () => { del.disabled = true; try { await deleteComment(c.id); refresh(); } catch (e) { msg.textContent = fbError(e); del.disabled = false; } };
+          r.append(del);
+        }
+        list.appendChild(r);
+      });
+    } catch (e) { console.error(e); list.innerHTML = ''; summary.textContent = ''; list.appendChild(el('p', {}, fbError(e))); }
+  }
+  modal('Reviews', box, [
+    { label:'Post', cls:'primary', fn:() => {
+        const nm = name.value.trim().slice(0, 20) || 'Anonymous', tx = text.value.trim().slice(0, 300);
+        if (!tx && !rating){ msg.textContent = 'Add some stars or a few words first.'; return true; }
+        lsSet(K_NAME, nm);
+        addComment({ name:nm, text:tx || '(no comment)', rating })
+          .then(() => { text.value = ''; rating = 0; paintStars(); msg.textContent = 'Thanks for the review!'; refresh(); })
+          .catch(e => { console.error(e); msg.textContent = fbError(e); });
+        return true;
+    } },
+    { label:'Close' },
+  ]);
+  refresh();
+}
+
+/* ================================================================== *
+ *  MENU
+ * ================================================================== */
+let menuTab = 'community';
+function deviceRecs(){
+  let recs = lsGet(K_COURSES, {});
+  const legacy = lsGet(K_LEGACY, null);
+  if (legacy && !recs.__migrated){
+    Object.keys(legacy).forEach(n => {
+      const id = 'L' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
+      recs[id] = { id, name:String(n).slice(0, 20), par:null, thumb:'', data:JSON.stringify(legacy[n]), updatedAt:Date.now() };
+    });
+    recs.__migrated = true; lsSet(K_COURSES, recs);
+  }
+  return recs;
+}
+function ensureThumb(rec){
+  if (rec.thumb && rec.par !== undefined) return false;
+  try { const o = JSON.parse(rec.data); rec.thumb = thumbOf(o); rec.par = parOfData(o); return true; } catch (e) { rec.thumb = ''; rec.par = null; return false; }
+}
+function renderConn(){
+  const c = $('conn');
+  if (fbState === 'ok'){ c.textContent = 'Online: shared courses and reviews are live.'; c.className = 'conn ok'; }
+  else if (fbState === 'fail'){ c.textContent = 'Offline mode: courses and reviews stay on this device. Host this file with Firebase to share them.'; c.className = 'conn'; }
+  else { c.textContent = 'Connecting to shared courses...'; c.className = 'conn'; }
+}
+function cardEl(it, label, canDelete){
+  const c = el('article', { className:'cc' });
+  const tb = el('button', { className:'thumb', type:'button', title:'Play ' + it.name });
+  if (it.thumb) tb.appendChild(el('img', { src:it.thumb, alt:'Preview of ' + it.name, draggable:false }));
+  tb.onclick = () => openCourse(it, it.par ? 'viewer' : 'editor');
+  const body = el('div', { className:'cc-body' });
+  body.append(el('div', { className:'cc-title' }, it.name), el('div', { className:'cc-meta' }, (it.par ? 'Par ' + it.par : 'Unfinished') + '  |  ' + label));
+  const acts = el('div', { className:'cc-actions' });
+  const play = el('button', { className:'btn sm primary' }, 'Play'); play.disabled = !it.par; play.onclick = () => openCourse(it, 'viewer');
+  const edit = el('button', { className:'btn sm' }, 'Edit'); edit.onclick = () => openCourse(it, 'editor');
+  acts.append(play, edit);
+  if (canDelete){
+    const del = el('button', { className:'btn sm' }, 'Delete');
+    del.onclick = () => confirmModal('Delete course?', 'Delete "' + it.name + '" from this device?', 'Delete', () => {
+      const recs = deviceRecs(); delete recs[it.id]; lsSet(K_COURSES, recs);
+      const cm = lsGet(K_COMMENTS, {}); delete cm[it.id]; lsSet(K_COMMENTS, cm); renderMenu();
+    });
+    acts.append(del);
+  }
+  body.append(acts); c.append(tb, body);
+  return c;
+}
+function renderMenu(){
+  $('tabCommunity').classList.toggle('on', menuTab === 'community');
+  $('tabDevice').classList.toggle('on', menuTab === 'device');
+  renderConn();
+  const grid = $('cards'); grid.innerHTML = '';
+  const empty = msg => grid.appendChild(el('div', { className:'empty' }, msg));
+  if (menuTab === 'device'){
+    if (renderMenu.demoThumb === undefined){ try { renderMenu.demoThumb = thumbOf(getDemoData()); } catch (e) { renderMenu.demoThumb = ''; } }
+    grid.appendChild(cardEl({ id:'demo', source:'demo', name:'Demo hills', par:parOfData(getDemoData()), thumb:renderMenu.demoThumb }, 'Demo', false));
+    const recs = deviceRecs(); let touched = false;
+    const items = Object.keys(recs).filter(k => k !== '__migrated').map(k => recs[k]).sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+    items.forEach(r => { if (ensureThumb(r)) touched = true; });
+    if (touched) lsSet(K_COURSES, recs);
+    items.forEach(r => grid.appendChild(cardEl({ id:r.id, source:'local', name:r.name, par:r.par || null, thumb:r.thumb, data:r.data }, 'On this device', true)));
+    if (!items.length) empty('Courses you save on this device show up here. Hit New course to make one!');
+    return;
+  }
+  if (fbState === 'fail'){ empty('Shared courses are only available in the hosted version. Your device courses still work: open the "On this device" tab.'); return; }
+  if (fbState === 'connecting' || commState.status === 'loading'){ empty('Loading courses...'); return; }
+  if (commState.status === 'error'){ empty(commState.msg); return; }
+  if (!communityList || !communityList.length){ empty('Nothing shared yet. Build a course and hit Publish online!'); return; }
+  communityList.forEach(it => grid.appendChild(cardEl(it, 'Community', false)));
+}
+async function openCourse(rec, wantRole){
+  try {
+    let obj;
+    if (rec.source === 'demo') obj = getDemoData();
+    else if (rec.source === 'local') obj = JSON.parse(rec.data);
+    else { notify('Loading ' + rec.name + '...'); obj = await fetchOnlineData(rec.id); }
+    loadData(obj);
+    courseName = rec.name; curCourse = { id:rec.id, source:rec.source };
+    role = (wantRole === 'viewer' && tee && hole) ? 'viewer' : 'editor';
+    mode = role === 'viewer' ? 'play' : 'edit';
+    showGame();
+    if (role === 'viewer') startPlay();
+    else if (wantRole === 'viewer') toast('This course has no tee or hole yet, so you are editing');
+  } catch (e) { console.error(e); notify('Could not open that course. ' + fbError(e)); }
+}
+function saveLocal(){
+  courseName = ($('nameIn').value.trim() || 'My course').slice(0, 20);
+  const data = serialize(), recs = deviceRecs();
+  const id = curCourse.source === 'local' ? curCourse.id : 'L' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
+  recs[id] = { id, name:courseName, par:calcPar(), thumb:thumbOf(data), data:JSON.stringify(data), updatedAt:Date.now() };
+  const ok = lsSet(K_COURSES, recs);
+  if (curCourse.source !== 'online'){ curCourse = { id, source:'local' }; changed = false; }
+  syncUI(); toast(ok ? 'Saved "' + courseName + '" on this device' : 'Saved for this session only (storage is blocked)');
+}
+
+/* ---- screens ---- */
+function showMenu(){
+  screen = 'menu'; aim = null; dirty = true;
+  $('menu').hidden = false; $('game').hidden = true;
+  if (fbState === 'ok' && communityList === null) loadCommunity(); else renderMenu();
+  window.scrollTo(0, 0);
+}
+function showGame(){
+  screen = 'game'; dirty = true;
+  $('menu').hidden = true; $('game').hidden = false;
+  fit(); syncUI(); window.scrollTo(0, 0);
+}
+async function initOnline(){
+  fbState = 'connecting'; renderMenu();
+  try { await withTimeout(getFB(), 8000); fbState = 'ok'; loadCommunity(); }
+  catch (e) { fbState = 'fail'; menuTab = 'device'; renderMenu(); }
+}
+function drawHero(){
+  const hc = $('heroCv'), HW = 320, HH = 80, prev = ctx;
+  ctx = hc.getContext('2d');
+  try {
+    const sky = ['#7cc0ee', '#8ccaf2', '#9cd4f5', '#b0defa', '#c4e8fc'];
+    for (let i = 0; i < 5; i++) rect(0, i*10, HW, 10, sky[i]);
+    [[40,36,22],[160,32,30],[262,40,20]].forEach(([cx, cy, w]) => { rect(cx, cy, w, 4, '#fff'); rect(cx+3, cy-3, w-8, 3, '#fff'); rect(cx+6, cy+4, w-10, 2, '#dbeeff'); });
+    for (let x = 0; x < HW; x++){ const hy = Math.floor(46 + Math.sin(x*0.03)*5 + Math.sin(x*0.09)*2); rect(x, hy, 1, HH-hy, '#5c9c62'); }
+    for (let x = 0; x < HW; x++){
+      const gy = Math.floor(58 + Math.sin(x*0.045 + 1)*4);
+      rect(x, gy, 1, HH-gy, '#3a7a3c'); rect(x, gy+3, 1, 8, ((x >> 2) & 1) ? '#6eb64f' : '#78c258');
+    }
+    rect(232, 66, 34, 6, '#3a78c8'); rect(236, 64, 26, 2, '#3a78c8'); rect(234, 72, 30, 2, '#3068b0'); rect(238, 67, 8, 1, '#8cbcf0');
+    const blob = (cx, cy, r) => { for (let y = -r; y <= r; y++) for (let x = -r; x <= r; x++) if (x*x + y*y <= r*r) rect(cx+x, cy+y, 1, 1, (y < -r/2) ? '#5aa060' : (y > r/3 ? '#1c4a2a' : '#2c6a3c')); };
+    blob(16, 60, 7); blob(300, 58, 8); blob(26, 66, 5); blob(292, 66, 5); blob(120, 58, 4);
+    drawDeco({ t:0, x:64, y:66 }, 900); drawDeco({ t:3, x:98, y:72 }, 0); drawDeco({ t:4, x:178, y:71 }, 0);
+    drawDeco({ t:5, x:130, y:74 }, 0); drawDeco({ t:2, x:210, y:70 }, 0);
+    drawHole({ x:284, y:72 }); drawFlag({ x:284, y:72 }, 0);
+    drawBallAt(150, 72, 0, 1);
+  } finally { ctx = prev; }
+}
+
+/* ================================================================== *
+ *  PLAY
+ * ================================================================== */
+function canAim(){ return mode === 'play' && !ball.moving && ball.sink === 0 && !ball.holed; }
+function resetBall(){
+  ball.x = tee.x + .5; ball.y = tee.y + .5; ball.vx = ball.vy = 0; ball.z = 0;
+  ball.air = false; ball.sink = 0; ball.holed = false; ball.moving = false;
+  ball.lx = ball.x; ball.ly = ball.y; strokes = 0; aim = null; parts.length = 0;
+  $('result').classList.remove('show');
+}
+function startPlay(){
+  if (!tee || !hole){
+    toast(!tee && !hole ? 'Place a tee spot and a hole first' : !tee ? 'Place a tee spot first' : 'Place a hole first');
+    return;
+  }
+  mode = 'play'; ensureBuilt(); resetBall(); syncUI();
+}
+function stopPlay(){ if (role !== 'editor') return; mode = 'edit'; aim = null; $('result').classList.remove('show'); syncUI(); }
+function setRole(r){
+  if (r === role) return;
+  if (r === 'viewer'){
+    if (!tee || !hole){ toast('Add a tee spot and a hole before viewing'); return; }
+    role = 'viewer'; startPlay();
+  } else { role = 'editor'; mode = 'edit'; aim = null; $('result').classList.remove('show'); dirty = true; syncUI(); }
+}
+
+function shoot(ux, uy, p){
+  const club = currentClub(), lie = clamp(getT(ball.x, ball.y), 0, 6);
+  ball.lx = ball.x; ball.ly = ball.y; strokes++;
+  if (club === 'driver'){
+    const c = carryOf(p) * LIE_PW[lie], Tt = Math.round(18 + 22*p), v = c / Tt;
+    ball.vx = ux*v; ball.vy = uy*v; ball.air = true; ball.t = 0; ball.T = Tt; ball.H = 9 + 26*p;
+  } else {
+    const v = 0.35 + 2.05*p;
+    ball.vx = ux*v; ball.vy = uy*v; ball.air = false;
+  }
+  ball.moving = true; sfx.hit();
+}
+function penalty(kind){
+  strokes++;
+  if (kind === 'water'){
+    spawnBurst(ball.x, ball.y, 26, ['#b9dcff', '#fff', '#5a9be0'], 1.6, 1.5); sfx.splash(); toast('Splash! +1 stroke');
+  } else {
+    spawnBurst(ball.x, ball.y, 14, ['#ffd23f', '#fff'], 1.2, 1); sfx.oob(); toast('Out of bounds! +1 stroke');
+  }
+  ball.x = ball.lx; ball.y = ball.ly; ball.vx = ball.vy = 0; ball.z = 0; ball.air = false; ball.moving = false;
+}
+function stopBall(){ ball.vx = ball.vy = 0; ball.z = 0; ball.air = false; ball.moving = false; }
+function settle(){
+  if (Math.hypot(ball.vx, ball.vy) >= .06) return;
+  const t = clamp(getT(ball.x, ball.y), 0, 6);
+  if (slopeMagAt(ball.x, ball.y) < STATIC[t]) stopBall();
+}
+
+function moveBall(n, air){
+  for (let i = 0; i < n; i++){
+    let nx = ball.x + ball.vx / n, ny = ball.y + ball.vy / n;
+    const h = probe(nx, ny);
+    if (h && (!air || ball.z < h)){
+      const e = probeWall ? 0.82 : 0.45, wall = probeWall;
+      const nrm = contactNormal(nx, ny, air, ball.z);
+      let hit = false, imp = 0;
+      if (nrm){
+        const dot = ball.vx*nrm.x + ball.vy*nrm.y;
+        if (dot < -0.001){ imp = -dot; ball.vx -= (1+e)*dot*nrm.x; ball.vy -= (1+e)*dot*nrm.y; hit = true; }
+      } else { imp = Math.hypot(ball.vx, ball.vy); ball.vx = -ball.vx*e; ball.vy = -ball.vy*e; hit = true; }
+      if (hit){
+        nx = ball.x; ny = ball.y;
+        if (imp > .35){
+          sfx.bounce();
+          spawnBurst(ball.x, ball.y, wall ? 3 : 4, wall ? ['#e0c086', '#a87c4e'] : ['#3f8f4f', '#1e5430'], .8, .4);
+        }
+        if (air){ ball.air = false; ball.z = 0; ball.vx *= .5; ball.vy *= .5; air = false; }
+      }
+    }
+    ball.x = nx; ball.y = ny;
+    if (!air){
+      if (getT(nx, ny) === T.WATER){ penalty('water'); return true; }
+      const d = Math.hypot(nx - (hole.x + .5), ny - (hole.y + .5)), sp = Math.hypot(ball.vx, ball.vy);
+      if (d < 2.6 && sp < SINK_MAX_SPEED){
+        ball.sink = 1; ball.moving = false; ball.vx = ball.vy = 0; sfx.cup();
+        spawnBurst(hole.x + .5, hole.y - 4, 34, ['#ffd23f', '#e8443a', '#fff', '#3fb0ff', '#7be07b'], 2.2, 2.4, 2);
+        return true;
+      }
+      if (d < 6 && sp < 1.4 && d > 0.01){
+        ball.vx += (hole.x + .5 - nx) / d * 0.03; ball.vy += (hole.y + .5 - ny) / d * 0.03;
+      }
+    }
+  }
+  return false;
+}
+function land(){
+  ball.air = false; ball.z = 0;
+  const tt = getT(ball.x, ball.y);
+  if (tt === T.WATER){ penalty('water'); return; }
+  if (tt === T.VOID || tt < 0 || ball.x < 2 || ball.y < 2 || ball.x >= W-2 || ball.y >= H-2){ penalty('oob'); return; }
+  const k = LAND[tt] || 0;
+  ball.vx *= k; ball.vy *= k;
+  if (tt === T.SAND) spawnBurst(ball.x, ball.y, 12, ['#e8d08e', '#d4b874', '#f4e4ae'], 1.1, .8);
+  else spawnBurst(ball.x, ball.y, 5, ['#5aa04c', '#3a7a3c'], .7, .5);
+  sfx.bounce();
+  settle();
+}
+function stepBall(){
+  if (ball.holed) return;
+  if (ball.sink > 0){ ball.sink++; if (ball.sink > 36) finishHole(); return; }
+  if (!ball.moving) return;
+  if (ball.air){
+    ball.t++;
+    const u = ball.t / ball.T;
+    ball.z = 4 * ball.H * u * (1 - u);
+    if (moveBall(Math.max(1, Math.ceil(Math.hypot(ball.vx, ball.vy))), true)) return;
+    if (ball.air && ball.t >= ball.T) land();
+    return;
+  }
+  const si = clamp(Math.floor(ball.y), 0, H-1)*W + clamp(Math.floor(ball.x), 0, W-1);
+  ball.vx -= SLOPE_K * gxA[si]; ball.vy -= SLOPE_K * gyA[si];
+  if (moveBall(Math.max(1, Math.ceil(Math.hypot(ball.vx, ball.vy))), false)) return;
+  if (!ball.moving) return;
+  const f = FRIC[clamp(getT(ball.x, ball.y), 0, 6)];
+  ball.vx *= f; ball.vy *= f;
+  settle();
+}
+function scoreName(s, par){
+  if (s === 1) return 'Hole in one!';
+  const d = s - par;
+  return d <= -3 ? 'Albatross!' : d === -2 ? 'Eagle!' : d === -1 ? 'Birdie!' : d === 0 ? 'Par' : d === 1 ? 'Bogey' : d === 2 ? 'Double bogey' : '+' + d;
+}
+function finishHole(){
+  ball.holed = true;
+  const par = calcPar(), r = $('result');
+  r.innerHTML = '';
+  const card = el('div', { className:'card' });
+  card.append(el('h3', {}, scoreName(strokes, par)), el('p', {}, strokes + (strokes === 1 ? ' stroke' : ' strokes') + ', par ' + par));
+  const row = el('div', { className:'row' });
+  const again = el('button', { className:'btn primary' }, 'Play again'), rev = el('button', { className:'btn' }, 'Leave a review');
+  again.onclick = () => { resetBall(); syncUI(); }; rev.onclick = openReviews;
+  row.append(again, rev);
+  if (role === 'editor'){ const ed = el('button', { className:'btn' }, 'Edit course'); ed.onclick = stopPlay; row.append(ed); }
+  card.appendChild(row); r.appendChild(card); r.classList.add('show');
+}
+
+/* ================================================================== *
+ *  POINTER INPUT
+ * ================================================================== */
+function toPt(e){ const r = cv.getBoundingClientRect(); return { x:(e.clientX - r.left) / r.width * W, y:(e.clientY - r.top) / r.height * H }; }
+const cell = p => ({ x:Math.floor(clamp(p.x, 0, W-1)), y:Math.floor(clamp(p.y, 0, H-1)) });
+
+function updatePower(){
+  let p = 0;
+  if (aim && canAim()) p = Math.min(1, Math.hypot(ball.x - aim.x, ball.y - aim.y) / maxDrag());
+  if (Math.hypot(ball.x - (aim ? aim.x : ball.x), ball.y - (aim ? aim.y : ball.y)) < 3) p = 0;
+  $('powerFill').style.width = Math.round(p*100) + '%';
+  $('powerFill').style.background = `hsl(${Math.round(120 - 120*p)},70%,45%)`;
+  $('powerTxt').textContent = p ? Math.round(p*100) + '%' : '';
+}
+
+cv.addEventListener('contextmenu', e => { e.preventDefault(); if (aim){ aim = null; updatePower(); } });
+cv.addEventListener('pointerdown', e => {
+  cv.setPointerCapture(e.pointerId);
+  const p = toPt(e);
+  if (mode === 'play'){
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    if (canAim()){ aim = p; updatePower(); }
+    return;
+  }
+  if (role !== 'editor') return;
+  const erase = e.button === 2, c = cell(p);
+  if (tool === 'brush'){
+    pushUndo(); dragging = { erase }; lastPt = c;
+    stamp(c.x, c.y, erase ? T.VOID : cur);
+  } else if (tool === 'fill'){
+    pushUndo(); floodFill(c.x, c.y, erase ? T.VOID : cur);
+  } else if (isHeightTool(tool)){
+    pushUndo(); hBase = elev.slice(); hW = new Float32Array(W*H);
+    dragging = { height:true, sign:erase ? -1 : 1 }; lastPt = c;
+    heightStamp(c.x, c.y, dragging.sign);
+  } else if (tool === 'deco'){
+    if (erase) removeDecoAt(p); else placeDeco(p);      // no dragging: one click, one decoration
+  } else if (tool === 'undeco'){
+    removeDecoAt(p);
+  } else { pushUndo(); dragging = { marker:tool }; placeMarker(tool, c); }
+});
+cv.addEventListener('pointermove', e => {
+  const p = toPt(e); hover = p;
+  if (mode === 'play'){ if (aim){ aim = p; updatePower(); } return; }
+  if (!dragging) return;
+  const c = cell(p);
+  if (dragging.marker) placeMarker(dragging.marker, c);
+  else if (dragging.height){ strokeLine(lastPt, c, (x, y) => heightStamp(x, y, dragging.sign)); lastPt = c; }
+  else { const t = dragging.erase ? T.VOID : cur; strokeLine(lastPt, c, (x, y) => stamp(x, y, t)); lastPt = c; }
+});
+function endPointer(){
+  if (mode === 'play'){
+    if (aim && canAim()){
+      const dx = ball.x - aim.x, dy = ball.y - aim.y, d = Math.hypot(dx, dy);
+      if (d >= 3) shoot(dx/d, dy/d, Math.min(1, d / maxDrag()));
+    }
+    aim = null; updatePower(); return;
+  }
+  dragging = null; lastPt = null;
+}
+cv.addEventListener('pointerup', endPointer);
+cv.addEventListener('pointercancel', () => { aim = null; dragging = null; updatePower(); });
+cv.addEventListener('pointerleave', () => { if (!dragging) hover = null; });
+
+/* ================================================================== *
+ *  UI WIRING
+ * ================================================================== */
+TERRAINS.forEach(t => {
+  const b = el('button', { className:'btn terrain-btn' + (t.wide ? ' span2' : '') });
+  b.dataset.terrain = t.id;
+  const chip = el('span', { className:'chip' }); chip.style.background = t.color;
+  b.append(chip, document.createTextNode(t.name));
+  b.onclick = () => { cur = t.id; if (tool !== 'brush' && tool !== 'fill') tool = 'brush'; syncUI(); };
+  $('terrains').appendChild(b);
+});
+DECOS.forEach((d, i) => {
+  const b = el('button', { className:'btn' }, d.name); b.dataset.deco = i;
+  b.onclick = () => { curDeco = i; tool = 'deco'; syncUI(); };
+  $('decos').appendChild(b);
+});
+document.querySelectorAll('[data-tool]').forEach(b => b.onclick = () => { tool = b.dataset.tool; syncUI(); });
+document.querySelectorAll('#clubs .btn').forEach(b => b.onclick = () => { clubMode = b.dataset.club; syncUI(); });
+document.querySelectorAll('#roleSeg .btn').forEach(b => b.onclick = () => setRole(b.dataset.role));
+$('size').oninput = e => { brushSize = +e.target.value; syncUI(); };
+$('hstep').oninput = e => { hstep = +e.target.value; syncUI(); };
+$('edgeBtn').onclick = () => { hardEdge = !hardEdge; syncUI(); };
+$('nameIn').oninput = e => { courseName = e.target.value; changed = true; setText('gTitle', courseName || 'Untitled'); };
+$('undoBtn').onclick = undo; $('redoBtn').onclick = redo;
+$('saveBtn').onclick = saveLocal;
+$('pubBtn').onclick = () => publishOnline(false);
+$('pubNewBtn').onclick = () => publishOnline(true);
+$('shareBtn').onclick = openShare;
+$('playBtn').onclick = startPlay;
+$('tabEdit').onclick = () => { if (mode !== 'edit') stopPlay(); };
+$('tabPlay').onclick = () => { if (mode !== 'play') startPlay(); };
+$('restartBtn').onclick = () => { resetBall(); syncUI(); };
+$('backBtn').onclick = stopPlay;
+$('reviewsBtn').onclick = openReviews;
+$('menuBtn').onclick = () => {
+  if (role === 'editor' && changed) confirmModal('Leave without saving?', 'You have changes that are not saved or published yet.', 'Leave', showMenu);
+  else showMenu();
+};
+document.querySelectorAll('.sfx').forEach(b => b.onclick = () => { sfxOn = !sfxOn; document.querySelectorAll('.sfx').forEach(x => x.textContent = sfxOn ? 'Sound on' : 'Sound off'); });
+$('tabCommunity').onclick = () => { menuTab = 'community'; renderMenu(); };
+$('tabDevice').onclick = () => { menuTab = 'device'; renderMenu(); };
+$('mNew').onclick = openNew; $('mImport').onclick = openImport;
+$('mRefresh').onclick = () => { if (fbState === 'ok') loadCommunity(); else if (fbState === 'fail') initOnline(); else renderMenu(); };
+
+function setText(id, v){ const e = $(id); if (e._v !== v){ e.textContent = v; e._v = v; } }
+function syncUI(){
+  const editor = role === 'editor', edit = mode === 'edit' && editor;
+  $('editPanel').hidden = !edit; $('playPanel').hidden = edit;
+  document.querySelectorAll('#roleSeg .btn').forEach(b => b.classList.toggle('on', b.dataset.role === role));
+  $('modeTabs').hidden = !editor; $('backBtn').hidden = !editor;
+  $('tabEdit').classList.toggle('on', edit); $('tabPlay').classList.toggle('on', !edit);
+  document.querySelectorAll('[data-tool]').forEach(b => b.classList.toggle('on', b.dataset.tool === tool));
+  document.querySelectorAll('[data-deco]').forEach(b => b.classList.toggle('on', tool === 'deco' && +b.dataset.deco === curDeco));
+  document.querySelectorAll('#terrains .btn').forEach(b => {
+    const paints = tool === 'brush' || tool === 'fill';
+    b.classList.toggle('on', +b.dataset.terrain === cur && paints);
+    b.classList.toggle('dim', !paints);
+  });
+  document.querySelectorAll('#clubs .btn').forEach(b => b.classList.toggle('on', b.dataset.club === clubMode));
+  $('sizeVal').textContent = brushSize + 'px'; $('size').value = brushSize;
+  $('hstepVal').textContent = hstep; $('hstep').value = hstep;
+  $('edgeBtn').textContent = 'Edge: ' + (hardEdge ? 'hard' : 'soft');
+  if (document.activeElement !== $('nameIn')) $('nameIn').value = courseName;
+  setText('gTitle', courseName || 'Untitled');
+  $('undoBtn').disabled = !undoStack.length; $('redoBtn').disabled = !redoStack.length;
+  const online = curCourse.source === 'online';
+  $('pubBtn').textContent = online ? 'Update online' : 'Publish online';
+  $('pubNewBtn').hidden = !online;
+  $('pubBtn').disabled = pubBusy; $('pubNewBtn').disabled = pubBusy;
+  const par = calcPar();
+  $('status').innerHTML =
+    'Tee: <b class="' + (tee ? 'ok' : '') + '">' + (tee ? 'set' : 'not set') + '</b><br>' +
+    'Hole: <b class="' + (hole ? 'ok' : '') + '">' + (hole ? 'set' : 'not set') + '</b><br>' +
+    'Par: <b>' + (par || '-') + '</b>';
+  $('hint').textContent = !edit
+    ? (editor ? 'Drag back from anywhere and let go to swing. Walls bounce the ball and downhill rolls faster. Keys: R restart, C club, E edit.'
+              : 'Viewer mode: drag back from anywhere and let go to swing. Walls bounce the ball and downhill rolls faster. Press Reviews to leave a comment.')
+    : (tool === 'deco' || tool === 'undeco')
+      ? 'Click to place one decoration. Dragging does not place more. Right-click removes the nearest one.'
+      : 'Drag to paint. Right-click erases to void (or reverses raise and lower). Keys: B brush, F fill, R raise, L lower, G flatten, T tee, H hole, D decorate, 1-7 terrain, [ ] size, Ctrl+Z undo.';
+  cv.style.cursor = edit ? 'crosshair' : 'grab';
+  const heat = isHeightTool(tool) && edit;
+  if (heat !== lastHeat){ lastHeat = heat; dirty = true; }
+  if (!edit) { setText('pName', courseName); setText('pPar', String(par || '-')); }
+}
+function updateHUD(){
+  if (mode !== 'play') return;
+  setText('pStrokes', String(strokes));
+  const lie = getT(ball.x, ball.y);
+  setText('pLie', lie >= 0 ? LIE_NAMES[lie] : '-');
+  setText('pDist', Math.round(Math.hypot(ball.x - hole.x - .5, ball.y - hole.y - .5) * 2.2) + ' yd');
+}
+
+/* ---- keyboard ---- */
+window.addEventListener('keydown', e => {
+  if (modalOpen || screen !== 'game') return;
+  const tag = e.target.tagName;
+  if (tag === 'INPUT' && e.target.type !== 'range' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+  const k = e.key.toLowerCase();
+  if (mode === 'edit' && role === 'editor'){
+    if ((e.ctrlKey || e.metaKey) && k === 'z'){ e.preventDefault(); e.shiftKey ? redo() : undo(); return; }
+    if ((e.ctrlKey || e.metaKey) && k === 'y'){ e.preventDefault(); redo(); return; }
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    if (k === 'b') tool = 'brush'; else if (k === 'f') tool = 'fill'; else if (k === 't') tool = 'tee'; else if (k === 'h') tool = 'hole';
+    else if (k === 'r') tool = 'raise'; else if (k === 'l') tool = 'lower'; else if (k === 'g') tool = 'flat'; else if (k === 'd') tool = 'deco';
+    else if (k >= '1' && k <= '7'){ cur = +k - 1; if (tool !== 'brush' && tool !== 'fill') tool = 'brush'; }
+    else if (k === '[') brushSize = Math.max(1, brushSize - 1);
+    else if (k === ']') brushSize = Math.min(20, brushSize + 1);
+    else return;
+    syncUI();
+  } else if (mode === 'play'){
+    if (k === 'r'){ resetBall(); syncUI(); }
+    else if ((k === 'e' || k === 'escape') && role === 'editor') stopPlay();
+    else if (k === 'c'){ const o = ['auto', 'driver', 'putter']; clubMode = o[(o.indexOf(clubMode) + 1) % 3]; syncUI(); }
+  }
+});
+
+/* ---- sizing: integer pixel scale on big screens for crisp pixels ---- */
+function fit(){
+  const avail = Math.floor(stage.clientWidth - 14);
+  if (avail <= 0) return;
+  const w = avail >= 480 ? W * Math.floor(avail / W) : avail;
+  cv.style.width = w + 'px'; cv.style.height = (w * H / W) + 'px';
+}
+new ResizeObserver(fit).observe(stage);
+window.addEventListener('resize', fit);
+
+/* ================================================================== *
+ *  MAIN LOOP + BOOT
+ * ================================================================== */
+let last = performance.now(), acc = 0;
+function frame(now){
+  acc += Math.min(100, now - last); last = now;
+  while (acc >= 16.667){ acc -= 16.667; if (screen === 'game' && mode === 'play') stepBall(); stepParticles(); }
+  if (screen === 'game'){ updateHUD(); render(now); }
+  requestAnimationFrame(frame);
+}
+
+newCourse('My course', T.VOID);
+drawHero();
+menuTab = 'community';
+showMenu();
+initOnline();
+requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

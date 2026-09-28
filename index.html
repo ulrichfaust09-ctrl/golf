@@ -160,11 +160,13 @@ input[type=range]{width:100%;accent-color:var(--accent);margin:4px 0 0}
       <div class="tabs">
         <button class="btn" id="tabCommunity">Community</button>
         <button class="btn" id="tabDevice">On this device</button>
+        <button class="btn" id="tabChains">Multi course</button>
       </div>
       <div class="tabs">
         <button class="btn primary" id="mNew">New course</button>
         <button class="btn" id="mImport">Import code</button>
         <button class="btn" id="mRefresh">Refresh</button>
+        <button class="btn" id="authBtn">Sign in</button>
         <button class="btn sfx">Sound on</button>
       </div>
     </div>
@@ -185,6 +187,7 @@ input[type=range]{width:100%;accent-color:var(--accent);margin:4px 0 0}
         <button class="btn" id="tabEdit">Edit</button>
         <button class="btn" id="tabPlay">Play</button>
       </div>
+      <button class="btn" id="playersBtn">Players (1)</button>
       <button class="btn sfx">Sound on</button>
     </div>
 
@@ -204,6 +207,16 @@ input[type=range]{width:100%;accent-color:var(--accent);margin:4px 0 0}
           <button class="btn primary big" id="playBtn" style="margin-bottom:18px">Test play</button>
 
           <div class="panel">
+            <h2>Holes</h2>
+            <div class="tabs" id="holeTabs" style="flex-wrap:wrap"></div>
+            <div class="grid2" style="margin-top:10px">
+              <button class="btn" id="addHoleBtn">+ Add hole</button>
+              <button class="btn" id="delHoleBtn">Delete hole</button>
+            </div>
+            <p class="note">A course can have up to 18 holes. "!" means a hole still needs a tee or a hole.</p>
+          </div>
+
+          <div class="panel">
             <h2>Tool</h2>
             <div class="grid2">
               <button class="btn" data-tool="brush">Brush</button>
@@ -217,7 +230,7 @@ input[type=range]{width:100%;accent-color:var(--accent);margin:4px 0 0}
           <div class="panel">
             <h2>Terrain</h2>
             <div class="grid2" id="terrains"></div>
-            <p class="note">Void is out of bounds. The edge of your painted land becomes a bouncy wall.</p>
+            <p class="note">Void is out of bounds. The edge of your painted land becomes a bouncy wall. Mountain automatically sets its own height to the highest peak and blocks shots.</p>
             <h2 style="margin:14px 0 4px">Brush size <span id="sizeVal" style="color:var(--ink)"></span></h2>
             <input type="range" id="size" min="1" max="20" value="6" aria-label="Brush size">
           </div>
@@ -252,6 +265,7 @@ input[type=range]{width:100%;accent-color:var(--accent);margin:4px 0 0}
               <button class="btn primary span2" id="pubBtn">Publish online</button>
               <button class="btn span2" id="pubNewBtn" hidden>Publish as new</button>
               <button class="btn span2" id="shareBtn">Share code</button>
+              <button class="btn span2" id="linkBtn">Course Link</button>
             </div>
           </div>
         </div>
@@ -261,11 +275,14 @@ input[type=range]{width:100%;accent-color:var(--accent);margin:4px 0 0}
           <div class="panel">
             <h2>Now playing</h2>
             <div class="course-title" id="pName"></div>
+            <div class="note" id="pTurn" style="margin:-6px 0 10px"></div>
             <dl class="stats">
               <div><dt>Par</dt><dd id="pPar">-</dd></div>
               <div><dt>Strokes</dt><dd id="pStrokes">0</dd></div>
               <div><dt>To hole</dt><dd id="pDist">-</dd></div>
               <div><dt>Lie</dt><dd id="pLie">-</dd></div>
+              <div><dt>Wind</dt><dd id="pWind">-</dd></div>
+              <div><dt>Best</dt><dd id="pBest">-</dd></div>
             </dl>
           </div>
           <div class="panel">
@@ -297,7 +314,7 @@ input[type=range]{width:100%;accent-color:var(--accent);margin:4px 0 0}
  *  CONSTANTS
  * ================================================================== */
 const W = 240, H = 150;
-const T = { ROUGH:0, FAIRWAY:1, GREEN:2, SAND:3, WATER:4, TREE:5, VOID:6 };
+const T = { ROUGH:0, FAIRWAY:1, GREEN:2, SAND:3, WATER:4, TREE:5, VOID:6, MOUNTAIN:7 };
 const TERRAINS = [
   { id:0, name:'Rough',   color:'#3a7a3c' },
   { id:1, name:'Fairway', color:'#6eb64f' },
@@ -305,7 +322,8 @@ const TERRAINS = [
   { id:3, name:'Sand',    color:'#e8d08e' },
   { id:4, name:'Water',   color:'#3a78c8' },
   { id:5, name:'Trees',   color:'#1e5430' },
-  { id:6, name:'Void (walls)', color:'#1a2622', wide:true },
+  { id:6, name:'Void (walls)', color:'#1a2622' },
+  { id:7, name:'Mountain', color:'#8c8a84', wide:true },
 ];
 // solid = footprint [x0,y0,x1,y1] relative to the deco's base point
 const DECOS = [
@@ -315,18 +333,26 @@ const DECOS = [
   { name:'Bush' },
   { name:'Bench' },
   { name:'Flowers' },
+  { name:'Palm tree', solid:[-2,-2,2,0] },
+  { name:'Lamp post', solid:[-1,-1,1,0] },
+  { name:'Fountain',  solid:[-3,-1,3,1] },
+  { name:'Statue',    solid:[-2,-2,2,0] },
+  { name:'Fence',     solid:[-4,-1,4,0] },
+  { name:'Parasol' },
 ];
 const MAX_DECOS = 150;
-const LIE_NAMES = ['Rough','Fairway','Green','Sand','Water','Trees','Void'];
-const FRIC   = [0.935, 0.972, 0.978, 0.86, 0.9, 0.9, 0.9];
-const LAND   = [0.28, 0.42, 0.40, 0.03, 0, 0, 0];
-const LIE_PW = [0.85, 1, 1, 0.65, 1, 1, 1];
-const STATIC = [0.02, 0.014, 0.01, 0.045, 0, 0, 0];
-const TREE_H = 6, WALL_H = 5, DECO_H = 7;
+const MAX_HOLES = 18;
+const LIE_NAMES = ['Rough','Fairway','Green','Sand','Water','Trees','Void','Mountain'];
+const FRIC   = [0.935, 0.972, 0.978, 0.86, 0.9, 0.9, 0.9, 0.9];
+const LAND   = [0.28, 0.42, 0.40, 0.03, 0, 0, 0, 0];
+const LIE_PW = [0.85, 1, 1, 0.65, 1, 1, 1, 1];
+const STATIC = [0.02, 0.014, 0.01, 0.045, 0, 0, 0, 0];
+const TREE_H = 6, WALL_H = 5, DECO_H = 7, MOUNTAIN_H = 9;
 const SLOPE_K = 0.02;
 const HMAX = 60;
 const SINK_MAX_SPEED = 2.2;
-const K_COURSES = 'pixellinks:courses2', K_LEGACY = 'pixellinks:courses', K_COMMENTS = 'pixellinks:comments', K_NAME = 'pixellinks:player';
+const K_COURSES = 'pixellinks:courses2', K_LEGACY = 'pixellinks:courses', K_COMMENTS = 'pixellinks:comments', K_NAME = 'pixellinks:player', K_BEST = 'pixellinks:best', K_CHAINS = 'pixellinks:chains';
+const WIND_K = 0.0065, WIND_NAMES = ['Calm', 'Light air', 'Breezy', 'Windy'];
 const isHeightTool = t => t === 'raise' || t === 'lower' || t === 'flat';
 
 /* ================================================================== *
@@ -353,9 +379,13 @@ let hover = null, dragging = null, lastPt = null;
 let hBase = null, hW = null;
 let undoStack = [], redoStack = [];
 let modalOpen = false;
+let holes = [], curHole = 0, editHoleBeforePlay = 0;
+let players = [{ name:'You' }], round = null;
+let chainBounds = null, chainReturnWorld = null;
 
 const ball = { x:0, y:0, vx:0, vy:0, z:0, air:false, t:0, T:1, H:10, sink:0, holed:false, moving:false, lx:0, ly:0 };
 let strokes = 0, clubMode = 'auto', aim = null;
+const wind = { dx:0, dy:0, mag:0 };
 const parts = [];
 
 /* ================================================================== *
@@ -371,12 +401,57 @@ const getT = (x, y) => { x = Math.floor(x); y = Math.floor(y); return inb(x, y) 
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const el = (tag, props = {}, text) => { const e = document.createElement(tag); Object.assign(e, props); if (text) e.textContent = text; return e; };
 const withTimeout = (p, ms) => Promise.race([p, new Promise((_, rej) => setTimeout(() => rej({ code:'timeout', message:'timeout' }), ms))]);
+function rollWind(){ const a = Math.random() * Math.PI * 2, m = Math.random(); wind.dx = Math.cos(a); wind.dy = Math.sin(a); wind.mag = m; }
+function windLabel(){ return WIND_NAMES[clamp(Math.floor(wind.mag * WIND_NAMES.length), 0, WIND_NAMES.length - 1)]; }
+function bestFor(id){ const v = lsGet(K_BEST, {})[id]; return Number.isFinite(v) ? v : null; }
+function setBestIfBetter(id, s){ if (!id) return false; const all = lsGet(K_BEST, {}); if (!(id in all) || s < all[id]){ all[id] = s; lsSet(K_BEST, all); return true; } return false; }
 function nearMarker(x, y){
   for (const m of [tee, hole]) if (m && (x-m.x)*(x-m.x) + (y-m.y)*(y-m.y) < 16) return true;
   return false;
 }
 const parOf = (t, h) => (!t || !h) ? null : (d => d < 90 ? 3 : d < 170 ? 4 : 5)(Math.hypot(t.x - h.x, t.y - h.y));
 const calcPar = () => parOf(tee, hole);
+
+/* ---- multi-hole course management: `terrain/elev/decos/tee/hole/undoStack/redoStack`
+   above are always the currently checked-out hole; `holes[]` holds the rest. ---- */
+function blankHole(fill){
+  const t = new Uint8Array(W*H); if (fill !== undefined) t.fill(fill);
+  return { terrain:t, elev:new Int8Array(W*H), decos:[], tee:null, hole:null, undo:[], redo:[] };
+}
+function commitHole(){ holes[curHole] = { terrain, elev:elev.slice(), decos, tee, hole, undo:undoStack, redo:redoStack }; }
+function loadHoleIntoActive(i){
+  curHole = i;
+  const h = holes[i];
+  terrain = h.terrain; elev.set(h.elev); decos = h.decos.map(d => ({...d})); tee = h.tee; hole = h.hole;
+  undoStack = h.undo || []; redoStack = h.redo || [];
+  rebuildSolids(); dirty = true;
+}
+function checkoutHole(i){ commitHole(); loadHoleIntoActive(i); }
+function allHoleMarkers(){ return holes.map((h, i) => i === curHole ? { tee, hole } : { tee:h.tee, hole:h.hole }); }
+function allHolesReady(){ return allHoleMarkers().every(m => m.tee && m.hole); }
+function totalPar(){
+  const ms = allHoleMarkers();
+  if (!ms.length || ms.some(m => !m.tee || !m.hole)) return null;
+  return ms.reduce((s, m) => s + parOf(m.tee, m.hole), 0);
+}
+function chainLocate(globalIdx){
+  if (!chainBounds) return null;
+  let i = globalIdx;
+  for (let c = 0; c < chainBounds.length; c++){
+    if (i < chainBounds[c].count) return { courseIdx:c, holeIdx:i, courseName:chainBounds[c].name, courseCount:chainBounds.length, holeCount:chainBounds[c].count };
+    i -= chainBounds[c].count;
+  }
+  return null;
+}
+function turnLine(){
+  if (!round) return '';
+  let t;
+  const loc = chainLocate(round.holeIdx);
+  if (loc) t = 'Course ' + (loc.courseIdx + 1) + '/' + loc.courseCount + ' (' + loc.courseName + ') • Hole ' + (loc.holeIdx + 1) + '/' + loc.holeCount;
+  else t = 'Hole ' + (round.holeIdx + 1) + '/' + holes.length;
+  if (players.length > 1) t += ' • ' + players[round.playerIdx].name + "'s turn";
+  return t;
+}
 let toastTimer = 0, noteTimer = 0;
 function toast(msg){
   const e = $('toast'); e.textContent = msg; e.classList.add('show');
@@ -434,6 +509,8 @@ const C = {
   rimTop:[102,174,90], rimLeft:[72,144,74], treeDark:[16,52,32], treeDot:[56,124,66],
   wallTop:[224,192,134], wallFace:[168,124,78], wall2:[112,80,52],
   void:[24,36,31], voidD:[17,27,24],
+  rock:[132,128,122], rockD:[104,100,96], rockL:[160,156,148], rockRim:[74,70,66],
+  snow:[236,240,244], snowL:[255,255,255], snowD:[204,212,220],
 };
 
 /* ================================================================== *
@@ -499,6 +576,7 @@ function blockH(x, y){
   if (x < 2 || y < 2 || x >= W-2 || y >= H-2) return WALL_H;
   const i = y*W + x, t = terrain[i];
   if (t === T.VOID) return WALL_H;
+  if (t === T.MOUNTAIN) return MOUNTAIN_H;
   if (t === T.TREE) return TREE_H;
   return decoSolid[i] ? DECO_H : 0;
 }
@@ -509,7 +587,7 @@ function probe(x, y){
   for (const p of PROBE){
     const hh = blockH(x + p[0], y + p[1]);
     if (hh > h) h = hh;
-    if (hh === WALL_H) probeWall = true;
+    if (hh === WALL_H || hh === MOUNTAIN_H) probeWall = true;
   }
   return h;
 }
@@ -539,6 +617,7 @@ function buildBase(){
   waterIdx.length = 0;
   const heat = isHeightTool(tool) && mode === 'edit' && role === 'editor' && screen === 'game' && !noHeat;
   const trAt = (xx, yy) => xx >= 0 && yy >= 0 && xx < W && yy < H && wm[yy*W+xx] === 0 && terrain[yy*W+xx] === T.TREE;
+  const mtAt = (xx, yy) => xx >= 0 && yy >= 0 && xx < W && yy < H && wm[yy*W+xx] === 0 && terrain[yy*W+xx] === T.MOUNTAIN;
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++){
     const i = y*W + x, p = i*4, w = wm[i], h = hash(x, y);
     if (w){
@@ -568,9 +647,16 @@ function buildBase(){
       if (nL < t || nR < t || nU < t || nD < t) c = C.edgeSand;
     } else if (t === T.WATER){
       c = h < 128 ? C.water1 : C.water2;
-      const shore = n => n !== T.WATER && n !== T.TREE && n !== T.VOID;
+      const shore = n => n !== T.WATER && n !== T.TREE && n !== T.VOID && n !== T.MOUNTAIN;
       if (shore(nL) || shore(nR) || shore(nU) || shore(nD)) c = C.foam;
       else waterIdx.push(i);
+    } else if (t === T.MOUNTAIN){
+      if (!mtAt(x, y-1)) c = C.rockRim;
+      else if (!mtAt(x-1, y) || !mtAt(x-1, y-1)) c = C.rockRim;
+      else {
+        const snow = hs[i] > 34;
+        c = snow ? (h > 210 ? C.snowL : h < 60 ? C.snowD : C.snow) : (h < 70 ? C.rockD : h > 200 ? C.rockL : C.rock);
+      }
     } else { // TREE
       if (!trAt(x, y-1)) c = C.rimTop;
       else if (!trAt(x-1, y) || !trAt(x-1, y-1)) c = C.rimLeft;
@@ -581,11 +667,11 @@ function buildBase(){
       }
     }
     let f = 1;
-    if (t !== T.TREE){
+    if (t !== T.TREE && t !== T.MOUNTAIN){
       if (trAt(x-1, y-1) || trAt(x-2, y-1) || trAt(x-2, y-2)) f = 0.7;
       else if ((x > 0 && wm[i-1] === 1) || (y > 0 && wm[i-W] === 1)) f = 0.8;
     }
-    if (t !== T.WATER && t !== T.TREE){
+    if (t !== T.WATER && t !== T.TREE && t !== T.MOUNTAIN){
       const g = gxA[i] + gyA[i];
       f *= 1 + clamp(g * 0.09, -0.32, 0.32);
       f *= 1 + clamp(hs[i] * 0.004, -0.12, 0.16);
@@ -703,6 +789,53 @@ function drawDeco(d, now){
       for (const s of spots){ rect(x+s[0], y+s[1], 1, 1, s[2]); rect(x+s[0], y+s[1]+1, 1, 1, '#2f7a3a'); }
       break;
     }
+    case 6: { // palm tree
+      rect(x-3, y, 7, 1, 'rgba(0,0,0,.25)');
+      rect(x, y-1, 1, 1, '#a87c3c'); rect(x-1, y-3, 1, 2, '#9a6e34'); rect(x, y-5, 1, 2, '#8c6230'); rect(x-1, y-7, 1, 2, '#7c5228');
+      const fronds = [[-6,-9,'#2f8a44'], [-3,-11,'#3f9a52'], [2,-11,'#3f9a52'], [5,-9,'#2f8a44'], [-1,-12,'#4faa5e']];
+      for (const f of fronds){ rect(x+f[0], y+f[1], Math.abs(f[0])+2, 1, f[2]); }
+      rect(x-1, y-9, 3, 2, '#2f7a3a');
+      break;
+    }
+    case 7: { // lamp post
+      const on = (Math.floor(now / 900) % 2) === 0;
+      rect(x-2, y, 5, 1, 'rgba(0,0,0,.22)');
+      rect(x, y-9, 1, 9, '#2a2a30'); rect(x-1, y, 3, 1, '#1c1c22');
+      rect(x-2, y-13, 5, 2, '#3a3a42');
+      if (on){ rect(x-1, y-12, 3, 3, '#ffe08a'); ctx.fillStyle = 'rgba(255,224,138,.18)'; ctx.fillRect(x-4, y-15, 9, 9); }
+      else rect(x-1, y-12, 3, 3, '#6a6a58');
+      break;
+    }
+    case 8: { // fountain
+      rect(x-4, y, 9, 2, 'rgba(0,0,0,.22)');
+      rect(x-4, y-3, 9, 3, '#9a9ca4'); rect(x-3, y-4, 7, 1, '#b0b2ba');
+      const w = (Math.floor(now / 260) % 2) === 0;
+      rect(x-2, y-3, 5, 2, w ? '#5aa8e6' : '#4a98d6');
+      rect(x-1, y-7, 1, 4, '#c8e8fa'); rect(x, y-6, 1, 1, '#eaf6ff');
+      rect(x-1, y-8, 1, 1, '#fff');
+      break;
+    }
+    case 9: { // statue
+      rect(x-3, y, 7, 2, 'rgba(0,0,0,.24)');
+      rect(x-3, y-1, 7, 2, '#8a8c94'); rect(x-3, y-2, 7, 1, '#9a9ca4');
+      rect(x-1, y-7, 3, 5, '#7a7c84'); rect(x-2, y-9, 5, 2, '#8a8c94');
+      rect(x-1, y-9, 1, 1, '#6a6c74'); rect(x+1, y-9, 1, 1, '#6a6c74');
+      break;
+    }
+    case 10: { // fence
+      rect(x-4, y, 9, 1, 'rgba(0,0,0,.2)');
+      for (let i = -4; i <= 4; i += 2) { rect(x+i, y-4, 1, 4, '#a8703c'); rect(x+i, y-4, 1, 1, '#c48a4c'); }
+      rect(x-4, y-2, 9, 1, '#8c5a30');
+      break;
+    }
+    case 11: { // parasol
+      rect(x, y-1, 1, 1, 'rgba(0,0,0,.22)');
+      rect(x, y-8, 1, 8, '#d8d0b8');
+      const cols = ['#e8443a', '#f4f0e0'];
+      for (let i = -4; i <= 4; i++) rect(x+i, y-11, 1, 2, cols[(i + 4) % 2]);
+      rect(x-5, y-9, 11, 1, cols[0]);
+      break;
+    }
   }
 }
 function spawnBurst(x, y, n, colors, spd = 1.3, up = 1, size = 1){
@@ -735,12 +868,19 @@ function currentClub(){
 }
 const carryOf = p => 14 + 110*p;
 
+function drawWindIndicator(){
+  const ox = W - 15, oy = 13, len = 3 + 9 * wind.mag;
+  ctx.fillStyle = 'rgba(10,18,14,.35)'; ctx.fillRect(ox - 13, oy - 12, 26, 24);
+  for (let sVal = 2; sVal <= len; sVal += 2) rect(ox + wind.dx * sVal, oy + wind.dy * sVal, 1, 1, '#eef6ea');
+  const hx = ox + wind.dx * len, hy = oy + wind.dy * len;
+  rect(hx - wind.dy, hy + wind.dx, 1, 1, '#eef6ea'); rect(hx + wind.dy, hy - wind.dx, 1, 1, '#eef6ea');
+}
 function drawAim(){
   if (!aim || !canAim()) return;
   const dx = ball.x - aim.x, dy = ball.y - aim.y, d = Math.hypot(dx, dy);
   if (d < 3) return;
   const p = Math.min(1, d / maxDrag()), ux = dx/d, uy = dy/d;
-  const club = currentClub(), lie = clamp(getT(ball.x, ball.y), 0, 6);
+  const club = currentClub(), lie = clamp(getT(ball.x, ball.y), 0, 7);
   let len;
   if (club === 'driver') len = carryOf(p) * LIE_PW[lie];
   else { const v = 0.35 + 2.05*p; len = Math.min(110, v / (1 - FRIC[lie]) * 0.9); }
@@ -804,6 +944,7 @@ function render(now){
     for (const d of below) drawDeco(d, now);
     if (hole) drawFlag(hole, now);
     drawAim();
+    drawWindIndicator();
   }
   for (const p of parts){ ctx.fillStyle = p.c; ctx.fillRect(Math.floor(p.x), Math.floor(p.y), p.s, p.s); }
 }
@@ -819,8 +960,9 @@ function redo(){ if (!redoStack.length) return; undoStack.push(snapshot()); rest
 
 function paintPx(x, y, t){
   if (!inb(x, y)) return;
-  if ((t === T.WATER || t === T.TREE || t === T.VOID) && nearMarker(x, y)) return;
+  if ((t === T.WATER || t === T.TREE || t === T.VOID || t === T.MOUNTAIN) && nearMarker(x, y)) return;
   terrain[y*W + x] = t;
+  if (t === T.MOUNTAIN) elev[y*W + x] = HMAX;
 }
 function stamp(cx, cy, t){
   const r = brushSize/2, rr = brushRR(), R = Math.ceil(r);
@@ -860,8 +1002,9 @@ function floodFill(x0, y0, t){
     const i = stack.pop();
     if (terrain[i] !== target) continue;
     const x = i % W, y = (i / W) | 0;
-    if ((t === T.WATER || t === T.TREE || t === T.VOID) && nearMarker(x, y)) continue;
+    if ((t === T.WATER || t === T.TREE || t === T.VOID || t === T.MOUNTAIN) && nearMarker(x, y)) continue;
     terrain[i] = t;
+    if (t === T.MOUNTAIN) elev[i] = HMAX;
     if (x > 0) stack.push(i-1);
     if (x < W-1) stack.push(i+1);
     if (y > 0) stack.push(i-W);
@@ -874,7 +1017,7 @@ function clearAround(m){
     const x = m.x + dx, y = m.y + dy;
     if (!inb(x, y) || dx*dx + dy*dy > 16) continue;
     const t = terrain[y*W+x];
-    if (t === T.WATER || t === T.TREE || t === T.VOID) terrain[y*W+x] = 0;
+    if (t === T.WATER || t === T.TREE || t === T.VOID || t === T.MOUNTAIN){ terrain[y*W+x] = 0; if (t === T.MOUNTAIN) elev[y*W+x] = 0; }
   }
   // solid decorations too close to a marker get removed
   decos = decos.filter(d => !(DECOS[d.t].solid && Math.hypot(d.x - m.x, d.y - m.y) < 8));
@@ -908,15 +1051,12 @@ function removeDecoAt(p){
   pushUndo(); decos.splice(best, 1); rebuildSolids();
 }
 function newCourse(name, fill){
-  terrain = new Uint8Array(W*H); terrain.fill(fill); elev.fill(0); decos = []; rebuildSolids();
-  tee = null; hole = null; courseName = name || 'My course';
-  undoStack = []; redoStack = []; changed = false; dirty = true;
+  holes = [blankHole(fill)]; loadHoleIntoActive(0);
+  courseName = name || 'My course'; changed = false; round = null; chainBounds = null;
 }
 
-/* ---- demo course ---- */
+/* ---- demo course (two holes, to show off multi-hole play) ---- */
 function buildDemo(){
-  terrain = new Uint8Array(W*H); terrain.fill(T.VOID); elev.fill(0); decos = [];
-  tee = { x:26, y:116 }; hole = { x:206, y:38 };
   const disc = (cx, cy, r, t) => {
     for (let y = Math.floor(cy - r - 1); y <= cy + r + 1; y++) for (let x = Math.floor(cx - r - 1); x <= cx + r + 1; x++){
       const d2 = (x-cx)*(x-cx) + (y-cy)*(y-cy);
@@ -939,26 +1079,47 @@ function buildDemo(){
       elev[i] = clamp(elev[i] + Math.round(amt * 0.5 * (1 + Math.cos(Math.PI * d / r))), -HMAX, HMAX);
     }
   };
-  const fw = [[26,116],[58,110],[92,98],[124,91],[152,78],[178,58],[204,42]];
-  path(fw, 24, T.ROUGH);
-  [[140,110,22],[178,30,22],[60,84,16],[220,64,14]].forEach(a => disc(a[0], a[1], a[2], T.ROUGH));
-  path(fw, 8, T.FAIRWAY);
-  disc(118, 92, 11, T.FAIRWAY); disc(26, 116, 7, T.FAIRWAY);
-  disc(206, 38, 13, T.GREEN);
-  [[190,54,6],[222,52,5],[196,22,5],[106,106,6]].forEach(a => disc(a[0], a[1], a[2], T.SAND));
-  [[138,114,13],[154,120,10],[126,120,7],[166,26,9],[176,20,7]].forEach(a => disc(a[0], a[1], a[2], T.WATER));
-  [[60,84,5],[50,90,4],[70,76,4],[86,80,4],[104,78,4],[128,70,5],[148,60,5],[166,92,5],[182,76,5],[204,64,4],
-   [10,100,4],[14,128,5],[40,132,6],[58,124,4],[100,122,4],[168,44,4],[190,14,4]]
-    .forEach(a => disc(a[0], a[1], a[2], T.TREE));
-  bump(144, 62, 13, 14); bump(190, 74, 10, -9); bump(216, 28, 12, 7); bump(70, 102, 12, -8);
-  decos = [
-    { t:0, x:158, y:56 }, { t:1, x:36, y:124 }, { t:1, x:200, y:66 }, { t:1, x:96, y:112 },
-    { t:2, x:120, y:74 }, { t:2, x:214, y:72 }, { t:2, x:80, y:92 },
-    { t:3, x:46, y:104 }, { t:3, x:188, y:38 }, { t:3, x:232, y:70 },
-    { t:4, x:38, y:104 }, { t:5, x:62, y:96 }, { t:5, x:110, y:80 }, { t:5, x:186, y:20 }, { t:5, x:214, y:52 },
-  ];
-  rebuildSolids();
-  courseName = 'Demo hills'; dirty = true; undoStack = []; redoStack = [];
+  function hole1(){
+    terrain = new Uint8Array(W*H); terrain.fill(T.VOID); elev.fill(0); decos = [];
+    tee = { x:26, y:116 }; hole = { x:206, y:38 };
+    const fw = [[26,116],[58,110],[92,98],[124,91],[152,78],[178,58],[204,42]];
+    path(fw, 24, T.ROUGH);
+    [[140,110,22],[178,30,22],[60,84,16],[220,64,14]].forEach(a => disc(a[0], a[1], a[2], T.ROUGH));
+    path(fw, 8, T.FAIRWAY);
+    disc(118, 92, 11, T.FAIRWAY); disc(26, 116, 7, T.FAIRWAY);
+    disc(206, 38, 13, T.GREEN);
+    [[190,54,6],[222,52,5],[196,22,5],[106,106,6]].forEach(a => disc(a[0], a[1], a[2], T.SAND));
+    [[138,114,13],[154,120,10],[126,120,7],[166,26,9],[176,20,7]].forEach(a => disc(a[0], a[1], a[2], T.WATER));
+    [[60,84,5],[50,90,4],[70,76,4],[86,80,4],[104,78,4],[128,70,5],[148,60,5],[166,92,5],[182,76,5],[204,64,4],
+     [10,100,4],[14,128,5],[40,132,6],[58,124,4],[100,122,4],[168,44,4],[190,14,4]]
+      .forEach(a => disc(a[0], a[1], a[2], T.TREE));
+    bump(144, 62, 13, 14); bump(190, 74, 10, -9); bump(216, 28, 12, 7); bump(70, 102, 12, -8);
+    decos = [
+      { t:0, x:158, y:56 }, { t:1, x:36, y:124 }, { t:1, x:200, y:66 }, { t:1, x:96, y:112 },
+      { t:2, x:120, y:74 }, { t:2, x:214, y:72 }, { t:2, x:80, y:92 },
+      { t:3, x:46, y:104 }, { t:3, x:188, y:38 }, { t:3, x:232, y:70 },
+      { t:4, x:38, y:104 }, { t:5, x:62, y:96 }, { t:5, x:110, y:80 }, { t:5, x:186, y:20 }, { t:5, x:214, y:52 },
+    ];
+    return { terrain, elev:elev.slice(), decos, tee, hole, undo:[], redo:[] };
+  }
+  function hole2(){
+    terrain = new Uint8Array(W*H); terrain.fill(T.VOID); elev.fill(0); decos = [];
+    tee = { x:30, y:40 }; hole = { x:190, y:100 };
+    disc(30, 40, 16, T.ROUGH); disc(190, 100, 20, T.ROUGH);
+    path([[30,40],[80,52],[130,68],[190,100]], 10, T.ROUGH);
+    path([[30,40],[80,52],[130,68],[190,100]], 7, T.FAIRWAY);
+    disc(190, 100, 13, T.GREEN);
+    disc(110, 60, 16, T.WATER);
+    disc(150, 84, 6, T.SAND); disc(60, 46, 5, T.SAND);
+    bump(190, 100, 14, -6); bump(70, 30, 10, 9);
+    decos = [
+      { t:7, x:44, y:36 }, { t:11, x:206, y:92 }, { t:3, x:96, y:44 }, { t:5, x:170, y:112 }, { t:9, x:210, y:110 },
+    ];
+    return { terrain, elev:elev.slice(), decos, tee, hole, undo:[], redo:[] };
+  }
+  holes = [hole1(), hole2()];
+  loadHoleIntoActive(0);
+  courseName = 'Riverside Links'; changed = false; round = null; chainBounds = null;
 }
 
 /* ================================================================== *
@@ -978,24 +1139,46 @@ function rleDec(r, Ty, lo, hi){
   }
   return t;
 }
-const serialize = () => ({ v:3, name:courseName, w:W, h:H, tee, hole, rle:rleEnc(terrain), erle:rleEnc(elev), decos:decos.map(d => [d.t, d.x, d.y]) });
-function applyData(o){
-  if (!o || !Array.isArray(o.rle) || o.w !== W || o.h !== H) throw new Error('bad');
-  const t = rleDec(o.rle, Uint8Array, 0, 6);
-  const e = Array.isArray(o.erle) ? rleDec(o.erle, Int8Array, -HMAX, HMAX) : new Int8Array(W*H);
-  const ok = m => m && Number.isFinite(m.x) && Number.isFinite(m.y) ? { x:clamp(m.x|0, 0, W-1), y:clamp(m.y|0, 0, H-1) } : null;
-  const ds = [];
-  if (Array.isArray(o.decos)) for (const a of o.decos.slice(0, MAX_DECOS)){
-    if (Array.isArray(a) && Number.isInteger(a[0]) && a[0] >= 0 && a[0] < DECOS.length && Number.isFinite(a[1]) && Number.isFinite(a[2])) ds.push({ t:a[0], x:clamp(a[1]|0, 0, W-1), y:clamp(a[2]|0, 0, H-1) });
-  }
-  terrain = t; elev.set(e); tee = ok(o.tee); hole = ok(o.hole); decos = ds; rebuildSolids();
-  courseName = String(o.name || 'My course').slice(0, 20); dirty = true;
+function serialize(){
+  commitHole();
+  return {
+    v:4, name:courseName, w:W, h:H,
+    holes: holes.map(h => ({ tee:h.tee, hole:h.hole, rle:rleEnc(h.terrain), erle:rleEnc(h.elev), decos:h.decos.map(d => [d.t, d.x, d.y]) })),
+  };
 }
-function loadData(o){ applyData(o); undoStack = []; redoStack = []; changed = false; syncUI(); }
-const parOfData = o => o ? parOf(o.tee, o.hole) : null;
+function parseHoles(o, cap = MAX_HOLES){
+  if (!o || o.w !== W || o.h !== H) throw new Error('bad');
+  const list = Array.isArray(o.holes) ? o.holes : (Array.isArray(o.rle) ? [{ tee:o.tee, hole:o.hole, rle:o.rle, erle:o.erle, decos:o.decos }] : null);
+  if (!list || !list.length) throw new Error('bad');
+  const ok = m => m && Number.isFinite(m.x) && Number.isFinite(m.y) ? { x:clamp(m.x|0, 0, W-1), y:clamp(m.y|0, 0, H-1) } : null;
+  return list.slice(0, cap).map(hd => {
+    if (!Array.isArray(hd.rle)) throw new Error('bad');
+    const t = rleDec(hd.rle, Uint8Array, 0, 7);
+    const e = Array.isArray(hd.erle) ? rleDec(hd.erle, Int8Array, -HMAX, HMAX) : new Int8Array(W*H);
+    const ds = [];
+    if (Array.isArray(hd.decos)) for (const a of hd.decos.slice(0, MAX_DECOS)){
+      if (Array.isArray(a) && Number.isInteger(a[0]) && a[0] >= 0 && a[0] < DECOS.length && Number.isFinite(a[1]) && Number.isFinite(a[2])) ds.push({ t:a[0], x:clamp(a[1]|0, 0, W-1), y:clamp(a[2]|0, 0, H-1) });
+    }
+    return { terrain:t, elev:e, decos:ds, tee:ok(hd.tee), hole:ok(hd.hole), undo:[], redo:[] };
+  });
+}
+function applyData(o){
+  holes = parseHoles(o);
+  courseName = String(o.name || 'My course').slice(0, 20);
+  loadHoleIntoActive(0); dirty = true;
+}
+function loadData(o){ applyData(o); changed = false; round = null; chainBounds = null; syncUI(); }
+function parOfData(o){
+  if (!o) return null;
+  const list = Array.isArray(o.holes) ? o.holes : (Array.isArray(o.rle) ? [o] : null);
+  if (!list || !list.length) return null;
+  let total = 0;
+  for (const hd of list){ const p = parOf(hd.tee, hd.hole); if (!p) return null; total += p; }
+  return total;
+}
 
-function saveWorld(){ return { t:terrain, e:elev.slice(), tee, hole, decos, name:courseName, us:undoStack, rs:redoStack }; }
-function restoreWorld(s){ terrain = s.t; elev.set(s.e); tee = s.tee; hole = s.hole; decos = s.decos; courseName = s.name; undoStack = s.us; redoStack = s.rs; rebuildSolids(); dirty = true; }
+function saveWorld(){ commitHole(); return { holes, curHole, name:courseName }; }
+function restoreWorld(s){ holes = s.holes; courseName = s.name; loadHoleIntoActive(s.curHole); }
 function withCourse(obj, fn){
   const s = saveWorld(); noHeat = true;
   try { applyData(obj); ensureBuilt(); return fn(); }
@@ -1020,38 +1203,133 @@ const encodeCode = () => btoa(unescape(encodeURIComponent(JSON.stringify(seriali
 const decodeCode = s => JSON.parse(decodeURIComponent(escape(atob(s.trim()))));
 
 /* ================================================================== *
- *  FIREBASE  (shared courses + reviews, no accounts). Falls back to
- *  this-device-only storage if the SDK can't be reached.
+ *  FIREBASE  (project "projectsmoke": one sign-in shared with the other app).
+ *  Falls back to this-device-only storage if the SDK can't be reached.
  * ================================================================== */
 const firebaseConfig = {
-  apiKey: "AIzaSyB98iP-Eo2Vo8mkA2_FwDGQf7WUIDs1cqU",
-  authDomain: "golf-f8c09.firebaseapp.com",
-  projectId: "golf-f8c09",
-  storageBucket: "golf-f8c09.firebasestorage.app",
-  messagingSenderId: "680032084822",
-  appId: "1:680032084822:web:ce9c2ee75cff66d9822cf7",
-  measurementId: "G-Y60P3LHLEM"
+  apiKey: "AIzaSyCx7bjvaKvc9SkLpqwG7StrK-TUwR8uVbI",
+  authDomain: "projectsmoke-d43b4.firebaseapp.com",
+  projectId: "projectsmoke-d43b4",
+  storageBucket: "projectsmoke-d43b4.firebasestorage.app",
+  messagingSenderId: "1012525258463",
+  appId: "1:1012525258463:web:167b001e24c75da512fb6a",
+  measurementId: "G-MG94JFQ5YG"
 };
 const FB_VER = '10.14.1';
-let fbPromise = null, fbState = 'connecting', pubBusy = false;
+// If the other app signs people in with a username (turned into a fake email), put that email domain here.
+// Leave empty if people sign in with their real email.
+const USERNAME_EMAIL_DOMAIN = '';
+const COL = { courses:'golf_courses', data:'golf_courseData', comments:'golf_comments', profiles:'golf_profiles' };
+let fbPromise = null, fbState = 'connecting', pubBusy = false, user = null, playerName = '';
+const isOwner = () => !!(user && curCourse.source === 'online' && curCourse.ownerId && curCourse.ownerId === user.uid);
+const okName = n => typeof n === 'string' && n.length > 0 && n.length <= 20;
+const defaultName = () => String((user && (user.displayName || (user.email || '').split('@')[0])) || 'Player').slice(0, 20) || 'Player';
+
 function getFB(){
   if (!fbPromise){
     fbPromise = (async () => {
       const root = 'https://www.gstatic.com/firebasejs/' + FB_VER + '/';
-      const [appM, fs] = await Promise.all([import(root + 'firebase-app.js'), import(root + 'firebase-firestore.js')]);
+      const [appM, fs, au] = await Promise.all([import(root + 'firebase-app.js'), import(root + 'firebase-firestore.js'), import(root + 'firebase-auth.js')]);
       const app = appM.initializeApp(firebaseConfig);
+      const auth = au.getAuth(app);
+      au.onAuthStateChanged(auth, u => { user = u; loadProfile(); });
       import(root + 'firebase-analytics.js').then(async an => { if (await an.isSupported()) an.getAnalytics(app); }).catch(() => {});
-      return { fs, db: fs.getFirestore(app) };
+      return { fs, db: fs.getFirestore(app), au, auth };
     })().catch(e => { fbPromise = null; throw e; });
   }
   return fbPromise;
 }
 function fbError(e){
   const c = (e && e.code) || '', m = String((e && e.message) || '');
-  if (c === 'permission-denied') return 'Firestore rules are blocking this. Check the setup steps.';
+  if (c === 'permission-denied') return 'Firestore rules are blocking this. Check the rules were published.';
   if (c === 'failed-precondition') return 'Firestore is not set up yet, or it needs an index.';
   if (c === 'timeout' || c === 'unavailable' || /fetch|network|Failed to load|import|module/i.test(m)) return 'Could not reach Firebase. Check your connection.';
   return 'Something went wrong. Try again.';
+}
+function authError(e){
+  const c = (e && e.code) || '';
+  if (/invalid-credential|wrong-password|user-not-found|invalid-login/.test(c)) return 'Wrong email or password.';
+  if (c === 'auth/email-already-in-use') return 'That email already has an account. Use Sign in instead.';
+  if (c === 'auth/weak-password') return 'Passwords need at least 6 characters.';
+  if (c === 'auth/invalid-email') return 'That does not look like a valid email.';
+  if (c === 'auth/operation-not-allowed') return 'That sign-in method is not turned on in Firebase.';
+  if (c === 'auth/unauthorized-domain') return 'This website is not in Firebase authorized domains yet.';
+  if (c === 'auth/popup-closed-by-user' || c === 'auth/cancelled-popup-request') return '';
+  if (c === 'auth/too-many-requests') return 'Too many tries. Wait a bit and try again.';
+  return fbError(e);
+}
+
+/* ---- accounts: one Firebase user, plus a small game-only profile ---- */
+async function loadProfile(){
+  playerName = '';
+  if (!user){ renderAuth(); syncUI(); return; }
+  const uid = user.uid;
+  try {
+    const { fs, db } = await withTimeout(getFB(), 10000);
+    const ref = fs.doc(db, COL.profiles, uid);
+    const snap = await withTimeout(fs.getDoc(ref), 12000);
+    if (snap.exists() && okName(snap.data().name)) playerName = snap.data().name;
+    else { const nm = defaultName(); await fs.setDoc(ref, { name:nm, createdAt:fs.serverTimestamp(), updatedAt:fs.serverTimestamp() }); playerName = nm; }
+  } catch (e) { console.error(e); playerName = defaultName(); }
+  if (user && user.uid === uid){ renderAuth(); syncUI(); }
+}
+function renderAuth(){
+  const b = $('authBtn'); if (!b) return;
+  b.hidden = fbState === 'fail';
+  b.textContent = user ? (playerName || 'Account') : 'Sign in';
+}
+function openSignIn(after){
+  const box = el('div');
+  box.appendChild(el('p', { className:'muted' }, 'Sign in to publish courses and post reviews. Playing never needs an account.'));
+  const email = el('input', { className:'text', type:'text', placeholder:'Email or username', autocomplete:'username' });
+  const pw = el('input', { className:'text', type:'password', placeholder:'Password', autocomplete:'current-password' });
+  const msg = el('div', { className:'muted' });
+  box.append(email, pw, msg);
+  const toEmail = () => { let v = email.value.trim(); if (v && !v.includes('@') && USERNAME_EMAIL_DOMAIN) v += '@' + USERNAME_EMAIL_DOMAIN; return v; };
+  const run = async fn => {
+    msg.textContent = 'Working...';
+    try {
+      const f = await withTimeout(getFB(), 10000);
+      await fn(f);
+      user = f.auth.currentUser; loadProfile();
+      close(); if (after) after();
+    } catch (e) { console.error(e); msg.textContent = authError(e); }
+  };
+  const creds = () => {
+    const v = toEmail();
+    if (!v.includes('@') || !pw.value){ msg.textContent = 'Enter your email and password.'; return null; }
+    return v;
+  };
+  const close = modal('Sign in', box, [
+    { label:'Sign in', cls:'primary', fn:() => { const v = creds(); if (v) run(f => f.au.signInWithEmailAndPassword(f.auth, v, pw.value)); return true; } },
+    { label:'Create account', fn:() => { const v = creds(); if (v) run(f => f.au.createUserWithEmailAndPassword(f.auth, v, pw.value)); return true; } },
+    { label:'Google', fn:() => { run(f => f.au.signInWithPopup(f.auth, new f.au.GoogleAuthProvider())); return true; } },
+    { label:'Cancel' },
+  ]);
+}
+function openAccount(){
+  if (!user){ openSignIn(); return; }
+  const box = el('div');
+  box.appendChild(el('p', { className:'muted' }, 'Signed in as ' + (user.email || 'your account') + '. The same account works in the other app in this project.'));
+  const name = el('input', { className:'text', maxLength:20, value:playerName || defaultName() });
+  const msg = el('div', { className:'muted' });
+  box.append(el('p', {}, 'Player name'), name, msg);
+  modal('Account', box, [
+    { label:'Save name', cls:'primary', fn:() => {
+        const v = name.value.trim().slice(0, 20);
+        if (!v){ msg.textContent = 'Pick a name first.'; return true; }
+        (async () => {
+          try {
+            const { fs, db } = await getFB();
+            await fs.setDoc(fs.doc(db, COL.profiles, user.uid), { name:v, updatedAt:fs.serverTimestamp() }, { merge:true });
+            playerName = v; renderAuth(); msg.textContent = 'Saved.';
+          } catch (e) { msg.textContent = fbError(e); }
+        })();
+        return true;
+    } },
+    { label:'Sign out', fn:() => { getFB().then(f => f.au.signOut(f.auth)).catch(() => {}); return false; } },
+    { label:'Close' },
+  ]);
 }
 
 /* ---- community list ---- */
@@ -1060,13 +1338,14 @@ async function loadCommunity(){
   commState = { status:'loading' }; renderMenu();
   try {
     const { fs, db } = await withTimeout(getFB(), 10000);
-    const snap = await withTimeout(fs.getDocs(fs.query(fs.collection(db, 'courses'), fs.orderBy('updatedAt', 'desc'), fs.limit(40))), 15000);
+    const snap = await withTimeout(fs.getDocs(fs.query(fs.collection(db, COL.courses), fs.orderBy('updatedAt', 'desc'), fs.limit(40))), 15000);
     communityList = [];
     snap.forEach(d => {
       const v = d.data();
       if (typeof v.name !== 'string') return;
       communityList.push({
-        id:d.id, source:'online', name:v.name.slice(0, 20), par:[3, 4, 5].includes(v.par) ? v.par : null,
+        id:d.id, source:'online', name:v.name.slice(0, 20), par:(Number.isInteger(v.par) && v.par > 0 && v.par <= 90) ? v.par : null,
+        ownerId:typeof v.ownerId === 'string' ? v.ownerId : null, ownerName:typeof v.ownerName === 'string' ? v.ownerName.slice(0, 20) : '',
         thumb:(typeof v.thumb === 'string' && v.thumb.startsWith('data:image/jpeg;base64,')) ? v.thumb : '',
       });
     });
@@ -1076,29 +1355,33 @@ async function loadCommunity(){
 }
 async function fetchOnlineData(id){
   const { fs, db } = await withTimeout(getFB(), 10000);
-  const snap = await withTimeout(fs.getDoc(fs.doc(db, 'courseData', id)), 15000);
+  const snap = await withTimeout(fs.getDoc(fs.doc(db, COL.data, id)), 15000);
   if (!snap.exists()) throw new Error('missing');
   return JSON.parse(snap.data().data);
 }
 async function publishOnline(asNew){
   if (pubBusy) return;
-  if (!tee || !hole){ toast('Place a tee spot and a hole first'); return; }
+  commitHole();
+  const badIdx = holes.findIndex(h => !h.tee || !h.hole);
+  if (badIdx !== -1){ toast('Hole ' + (badIdx + 1) + ' needs a tee spot and a hole'); return; }
   if (fbState === 'fail'){ toast('Online sharing is only in the hosted version'); return; }
+  if (!user){ openSignIn(() => publishOnline(asNew)); return; }
   pubBusy = true; syncUI();
   courseName = ($('nameIn').value.trim() || 'My course').slice(0, 20);
-  toast('Sharing...');
+  toast('Publishing...');
   try {
     const { fs, db } = await withTimeout(getFB(), 10000);
-    const data = serialize(), thumb = thumbOf(data), par = calcPar();
-    const update = curCourse.source === 'online' && !asNew;
-    const cref = update ? fs.doc(db, 'courses', curCourse.id) : fs.doc(fs.collection(db, 'courses'));
+    const owner = playerName || defaultName();
+    const data = serialize(), thumb = thumbOf(data), par = totalPar();
+    const update = curCourse.source === 'online' && isOwner() && !asNew;
+    const cref = update ? fs.doc(db, COL.courses, curCourse.id) : fs.doc(fs.collection(db, COL.courses));
     const batch = fs.writeBatch(db);
-    if (update) batch.update(cref, { name:courseName, par, thumb, updatedAt:fs.serverTimestamp() });
-    else batch.set(cref, { name:courseName, par, thumb, createdAt:fs.serverTimestamp(), updatedAt:fs.serverTimestamp() });
-    batch.set(fs.doc(db, 'courseData', cref.id), { data:JSON.stringify(data) });
+    if (update) batch.update(cref, { name:courseName, par, thumb, ownerName:owner, updatedAt:fs.serverTimestamp() });
+    else batch.set(cref, { name:courseName, par, thumb, ownerId:user.uid, ownerName:owner, createdAt:fs.serverTimestamp(), updatedAt:fs.serverTimestamp() });
+    batch.set(fs.doc(db, COL.data, cref.id), { data:JSON.stringify(data) });
     await withTimeout(batch.commit(), 20000);
-    curCourse = { id:cref.id, source:'online' }; changed = false; communityList = null;
-    toast(update ? 'Updated for everyone!' : 'Shared! Everyone can find it');
+    curCourse = { id:cref.id, source:'online', ownerId:user.uid }; changed = false; communityList = null;
+    toast(update ? 'Updated!' : 'Published! Everyone can find it');
   } catch (e) { console.error(e); toast(fbError(e)); }
   pubBusy = false; syncUI();
 }
@@ -1108,10 +1391,10 @@ async function listComments(){
   const out = [];
   if (curCourse.source === 'online'){
     const { fs, db } = await withTimeout(getFB(), 10000);
-    const snap = await withTimeout(fs.getDocs(fs.query(fs.collection(db, 'courses', curCourse.id, 'comments'), fs.orderBy('createdAt', 'desc'), fs.limit(50))), 15000);
+    const snap = await withTimeout(fs.getDocs(fs.query(fs.collection(db, COL.courses, curCourse.id, COL.comments), fs.orderBy('createdAt', 'desc'), fs.limit(50))), 15000);
     snap.forEach(d => {
       const v = d.data();
-      out.push({ id:d.id, name:String(v.name || 'Anonymous').slice(0, 20), text:String(v.text || '').slice(0, 300), rating:clamp(+v.rating || 0, 0, 5),
+      out.push({ id:d.id, uid:typeof v.uid === 'string' ? v.uid : null, name:String(v.name || 'Anonymous').slice(0, 20), text:String(v.text || '').slice(0, 300), rating:clamp(+v.rating || 0, 0, 5),
         ts:(v.createdAt && v.createdAt.toMillis) ? v.createdAt.toMillis() : Date.now() });
     });
     return out;
@@ -1121,7 +1404,8 @@ async function listComments(){
 async function addComment(c){
   if (curCourse.source === 'online'){
     const { fs, db } = await withTimeout(getFB(), 10000);
-    await withTimeout(fs.addDoc(fs.collection(db, 'courses', curCourse.id, 'comments'), { name:c.name, text:c.text, rating:c.rating, createdAt:fs.serverTimestamp() }), 15000);
+    await withTimeout(fs.addDoc(fs.collection(db, COL.courses, curCourse.id, COL.comments),
+      { name:c.name, text:c.text, rating:c.rating, uid:user.uid, createdAt:fs.serverTimestamp() }), 15000);
     return;
   }
   const all = lsGet(K_COMMENTS, {});
@@ -1131,7 +1415,7 @@ async function addComment(c){
 async function deleteComment(id){
   if (curCourse.source === 'online'){
     const { fs, db } = await withTimeout(getFB(), 10000);
-    await withTimeout(fs.deleteDoc(fs.doc(db, 'courses', curCourse.id, 'comments', id)), 15000);
+    await withTimeout(fs.deleteDoc(fs.doc(db, COL.courses, curCourse.id, COL.comments, id)), 15000);
     return;
   }
   const all = lsGet(K_COMMENTS, {});
@@ -1209,25 +1493,63 @@ function openShare(){
     { label:'Close' },
   ]);
 }
-function openReviews(){
-  if (!curCourse.id){ toast('Save or publish this course first, then it can have reviews'); return; }
+function openPlayers(){
+  if (mode === 'play'){ toast('Finish or restart the round to change players'); return; }
   const box = el('div');
-  const where = curCourse.source === 'online' ? 'Shared with everyone.' : 'Saved on this device only.';
-  box.appendChild(el('p', { className:'muted' }, where));
-  const summary = el('p', {}), list = el('div');
-  const name = el('input', { className:'text', maxLength:20, placeholder:'Your name', value:lsGet(K_NAME, '') });
-  const stars = el('div', { className:'stars' });
-  let rating = 0;
-  const starBtns = [1, 2, 3, 4, 5].map(n => {
-    const b = el('button', { className:'btn', type:'button', title:n + ' stars' }, '★');
-    b.onclick = () => { rating = rating === n ? 0 : n; paintStars(); };
-    stars.appendChild(b); return b;
-  });
+  box.appendChild(el('p', { className:'muted' }, 'Pass-and-play: everyone takes turns on this device, one hole at a time. Up to 6 players.'));
+  const list = el('div'); box.appendChild(list);
+  let names = players.map(p => p.name);
+  function draw(){
+    list.innerHTML = '';
+    names.forEach((n, i) => {
+      const row = el('div', { className:'saved-row' });
+      const inp = el('input', { className:'text', maxLength:20, value:n, style:'margin-bottom:0' });
+      inp.oninput = () => { names[i] = inp.value; };
+      row.appendChild(inp);
+      if (names.length > 1){ const rm = el('button', { className:'btn sm' }, 'X'); rm.onclick = () => { names.splice(i, 1); draw(); }; row.appendChild(rm); }
+      list.appendChild(row);
+    });
+  }
+  draw();
+  const addBtn = el('button', { className:'btn wide', style:'margin-top:6px' }, '+ Add player');
+  addBtn.onclick = () => { if (names.length < 6){ names.push('Player ' + (names.length + 1)); draw(); } };
+  box.appendChild(addBtn);
+  modal('Players', box, [
+    { label:'Save', cls:'primary', fn:() => {
+        const clean = names.map(n => n.trim().slice(0, 20)).filter(Boolean);
+        players = (clean.length ? clean : ['You']).map(n => ({ name:n }));
+        toast(players.length > 1 ? players.length + ' players ready' : 'Playing solo');
+        syncUI();
+    } },
+    { label:'Cancel' },
+  ]);
+}
+function openReviews(){
+  if (curCourse.source === 'chain'){ toast('Reviews are not available for multi-course rounds yet'); return; }
+  if (!curCourse.id){ toast('Save or publish this course first, then it can have reviews'); return; }
+  const online = curCourse.source === 'online', needsAuth = online && !user;
+  const box = el('div');
+  box.appendChild(el('p', { className:'muted' }, online ? 'Shared with everyone.' : 'Saved on this device only.'));
+  const summary = el('p', {}), list = el('div'), msg = el('div', { className:'muted' });
+  box.append(summary, list);
+  let name = null, text = null, rating = 0, starBtns = [];
   const paintStars = () => starBtns.forEach((b, i) => b.classList.toggle('on', i < rating));
-  const text = el('textarea', { className:'text', maxLength:300, placeholder:'Write a review (optional if you give stars)' });
-  const msg = el('div', { className:'muted' });
-  box.append(summary, list, el('p', { className:'muted' }, 'Leave a review'), name, stars, text, msg);
+  if (needsAuth) box.appendChild(el('p', { className:'muted' }, 'Sign in to leave a review. You can still read them.'));
+  else {
+    box.appendChild(el('p', { className:'muted' }, online ? 'Posting as ' + (playerName || defaultName()) : 'Leave a review'));
+    if (!online){ name = el('input', { className:'text', maxLength:20, placeholder:'Your name', value:lsGet(K_NAME, '') }); box.appendChild(name); }
+    const stars = el('div', { className:'stars' });
+    starBtns = [1, 2, 3, 4, 5].map(n => {
+      const b = el('button', { className:'btn', type:'button', title:n + ' stars' }, '★');
+      b.onclick = () => { rating = rating === n ? 0 : n; paintStars(); };
+      stars.appendChild(b); return b;
+    });
+    text = el('textarea', { className:'text', maxLength:300, placeholder:'Write a review (optional if you give stars)' });
+    box.append(stars, text);
+  }
+  box.appendChild(msg);
   const stars5 = n => '★'.repeat(n) + '☆'.repeat(5 - n);
+  const canDelete = c => online ? !!(user && (c.uid === user.uid || (role === 'editor' && isOwner()))) : role === 'editor';
   async function refresh(){
     list.innerHTML = ''; list.appendChild(el('p', { className:'muted' }, 'Loading...'));
     try {
@@ -1244,7 +1566,7 @@ function openReviews(){
         r.append(head);
         if (c.text) r.append(el('div', { className:'rt' }, c.text));
         r.append(el('div', { className:'rd' }, new Date(c.ts).toLocaleDateString()));
-        if (role === 'editor'){
+        if (canDelete(c)){
           const del = el('button', { className:'btn sm', style:'margin-top:8px' }, 'Delete');
           del.onclick = async () => { del.disabled = true; try { await deleteComment(c.id); refresh(); } catch (e) { msg.textContent = fbError(e); del.disabled = false; } };
           r.append(del);
@@ -1253,18 +1575,20 @@ function openReviews(){
       });
     } catch (e) { console.error(e); list.innerHTML = ''; summary.textContent = ''; list.appendChild(el('p', {}, fbError(e))); }
   }
-  modal('Reviews', box, [
-    { label:'Post', cls:'primary', fn:() => {
-        const nm = name.value.trim().slice(0, 20) || 'Anonymous', tx = text.value.trim().slice(0, 300);
-        if (!tx && !rating){ msg.textContent = 'Add some stars or a few words first.'; return true; }
-        lsSet(K_NAME, nm);
-        addComment({ name:nm, text:tx || '(no comment)', rating })
-          .then(() => { text.value = ''; rating = 0; paintStars(); msg.textContent = 'Thanks for the review!'; refresh(); })
-          .catch(e => { console.error(e); msg.textContent = fbError(e); });
-        return true;
-    } },
-    { label:'Close' },
-  ]);
+  const buttons = needsAuth
+    ? [{ label:'Sign in', cls:'primary', fn:() => { openSignIn(() => openReviews()); return true; } }, { label:'Close' }]
+    : [{ label:'Post', cls:'primary', fn:() => {
+          const tx = text.value.trim().slice(0, 300);
+          if (!tx && !rating){ msg.textContent = 'Add some stars or a few words first.'; return true; }
+          let payload;
+          if (online) payload = { name:playerName || defaultName(), text:tx || '(no comment)', rating };
+          else { const nm = name.value.trim().slice(0, 20) || 'Anonymous'; lsSet(K_NAME, nm); payload = { name:nm, text:tx || '(no comment)', rating }; }
+          addComment(payload)
+            .then(() => { text.value = ''; rating = 0; paintStars(); msg.textContent = 'Thanks for the review!'; refresh(); })
+            .catch(e => { console.error(e); msg.textContent = fbError(e); });
+          return true;
+      } }, { label:'Close' }];
+  modal('Reviews', box, buttons);
   refresh();
 }
 
@@ -1272,6 +1596,10 @@ function openReviews(){
  *  MENU
  * ================================================================== */
 let menuTab = 'community';
+function chainStore(){ return lsGet(K_CHAINS, {}); }
+function saveChains(m){ lsSet(K_CHAINS, m); }
+const refKey = r => r.source + ':' + r.id;
+function myOnlineCourses(){ return (user && communityList) ? communityList.filter(c => c.ownerId === user.uid) : []; }
 function deviceRecs(){
   let recs = lsGet(K_COURSES, {});
   const legacy = lsGet(K_LEGACY, null);
@@ -1293,6 +1621,7 @@ function renderConn(){
   if (fbState === 'ok'){ c.textContent = 'Online: shared courses and reviews are live.'; c.className = 'conn ok'; }
   else if (fbState === 'fail'){ c.textContent = 'Offline mode: courses and reviews stay on this device. Host this file with Firebase to share them.'; c.className = 'conn'; }
   else { c.textContent = 'Connecting to shared courses...'; c.className = 'conn'; }
+  renderAuth();
 }
 function cardEl(it, label, canDelete){
   const c = el('article', { className:'cc' });
@@ -1300,7 +1629,8 @@ function cardEl(it, label, canDelete){
   if (it.thumb) tb.appendChild(el('img', { src:it.thumb, alt:'Preview of ' + it.name, draggable:false }));
   tb.onclick = () => openCourse(it, it.par ? 'viewer' : 'editor');
   const body = el('div', { className:'cc-body' });
-  body.append(el('div', { className:'cc-title' }, it.name), el('div', { className:'cc-meta' }, (it.par ? 'Par ' + it.par : 'Unfinished') + '  |  ' + label));
+  const b = bestFor(it.id);
+  body.append(el('div', { className:'cc-title' }, it.name), el('div', { className:'cc-meta' }, (it.par ? 'Par ' + it.par : 'Unfinished') + '  |  ' + label + (b !== null ? '  |  Best ' + b : '')));
   const acts = el('div', { className:'cc-actions' });
   const play = el('button', { className:'btn sm primary' }, 'Play'); play.disabled = !it.par; play.onclick = () => openCourse(it, 'viewer');
   const edit = el('button', { className:'btn sm' }, 'Edit'); edit.onclick = () => openCourse(it, 'editor');
@@ -1319,9 +1649,16 @@ function cardEl(it, label, canDelete){
 function renderMenu(){
   $('tabCommunity').classList.toggle('on', menuTab === 'community');
   $('tabDevice').classList.toggle('on', menuTab === 'device');
+  $('tabChains').classList.toggle('on', menuTab === 'chains');
   renderConn();
   const grid = $('cards'); grid.innerHTML = '';
   const empty = msg => grid.appendChild(el('div', { className:'empty' }, msg));
+  if (menuTab === 'chains'){
+    const items = Object.values(chainStore()).sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+    if (!items.length) empty('No linked courses yet. Open a course you own, press Course Link in its Course panel, and start a chain.');
+    else items.forEach(c => grid.appendChild(chainCardEl(c)));
+    return;
+  }
   if (menuTab === 'device'){
     if (renderMenu.demoThumb === undefined){ try { renderMenu.demoThumb = thumbOf(getDemoData()); } catch (e) { renderMenu.demoThumb = ''; } }
     grid.appendChild(cardEl({ id:'demo', source:'demo', name:'Demo hills', par:parOfData(getDemoData()), thumb:renderMenu.demoThumb }, 'Demo', false));
@@ -1337,7 +1674,7 @@ function renderMenu(){
   if (fbState === 'connecting' || commState.status === 'loading'){ empty('Loading courses...'); return; }
   if (commState.status === 'error'){ empty(commState.msg); return; }
   if (!communityList || !communityList.length){ empty('Nothing shared yet. Build a course and hit Publish online!'); return; }
-  communityList.forEach(it => grid.appendChild(cardEl(it, 'Community', false)));
+  communityList.forEach(it => grid.appendChild(cardEl(it, 'Community' + (it.ownerName ? ' | by ' + it.ownerName : ''), false)));
 }
 async function openCourse(rec, wantRole){
   try {
@@ -1346,26 +1683,135 @@ async function openCourse(rec, wantRole){
     else if (rec.source === 'local') obj = JSON.parse(rec.data);
     else { notify('Loading ' + rec.name + '...'); obj = await fetchOnlineData(rec.id); }
     loadData(obj);
-    courseName = rec.name; curCourse = { id:rec.id, source:rec.source };
-    role = (wantRole === 'viewer' && tee && hole) ? 'viewer' : 'editor';
+    courseName = rec.name; curCourse = { id:rec.id, source:rec.source, ownerId:rec.ownerId || null };
+    const ready = allHolesReady();
+    role = (wantRole === 'viewer' && ready) ? 'viewer' : 'editor';
     mode = role === 'viewer' ? 'play' : 'edit';
-    showGame();
+    showGame(); chainBounds = null;
     if (role === 'viewer') startPlay();
-    else if (wantRole === 'viewer') toast('This course has no tee or hole yet, so you are editing');
+    else if (wantRole === 'viewer') toast('This course is not finished yet, so you are editing');
+    else if (rec.source === 'online' && !isOwner()) toast('Not your course: Publish saves your own copy');
   } catch (e) { console.error(e); notify('Could not open that course. ' + fbError(e)); }
 }
 function saveLocal(){
   courseName = ($('nameIn').value.trim() || 'My course').slice(0, 20);
   const data = serialize(), recs = deviceRecs();
   const id = curCourse.source === 'local' ? curCourse.id : 'L' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
-  recs[id] = { id, name:courseName, par:calcPar(), thumb:thumbOf(data), data:JSON.stringify(data), updatedAt:Date.now() };
+  recs[id] = { id, name:courseName, par:totalPar(), thumb:thumbOf(data), data:JSON.stringify(data), updatedAt:Date.now() };
   const ok = lsSet(K_COURSES, recs);
   if (curCourse.source !== 'online'){ curCourse = { id, source:'local' }; changed = false; }
   syncUI(); toast(ok ? 'Saved "' + courseName + '" on this device' : 'Saved for this session only (storage is blocked)');
 }
 
+/* ---- Course Link: chain several of your own courses into one continuous round ---- */
+function openCourseLink(){
+  if (!curCourse.id){ toast('Save or publish this course first, then you can link it'); return; }
+  if (curCourse.source === 'online' && !isOwner()){ toast('You can only link courses you own'); return; }
+  const myRef = { id:curCourse.id, source:curCourse.source, name:courseName, par:totalPar(), thumb:thumbOf(serialize()) };
+  const key = refKey(myRef);
+  const box = el('div');
+  box.appendChild(el('p', { className:'muted' }, 'Chain this course with others you own into one continuous round — total strokes across all of them. Reorder from the Multi course tab.'));
+  const list = el('div'); box.appendChild(list);
+  const chains = chainStore(), ids = Object.keys(chains);
+  if (!ids.length) list.appendChild(el('p', { className:'muted' }, 'You have no chains yet — start one below.'));
+  ids.forEach(id => {
+    const c = chains[id], already = c.courses.some(r => refKey(r) === key);
+    const row = el('div', { className:'saved-row' });
+    row.appendChild(el('span', {}, c.name + ' (' + c.courses.length + ' course' + (c.courses.length === 1 ? '' : 's') + ')'));
+    const b = el('button', { className:'btn sm' }, already ? 'Already in' : 'Add here');
+    b.disabled = already;
+    b.onclick = () => { c.courses.push(myRef); c.updatedAt = Date.now(); saveChains(chains); toast('Added to "' + c.name + '"'); close(); };
+    row.appendChild(b); list.appendChild(row);
+  });
+  const nameIn = el('input', { className:'text', maxLength:20, placeholder:'New chain name', value:courseName + ' circuit', style:'margin-top:10px' });
+  box.appendChild(nameIn);
+  const close = modal('Course Link', box, [
+    { label:'Start new chain', cls:'primary', fn:() => {
+        const nm = nameIn.value.trim().slice(0, 20) || 'My circuit';
+        const id = 'C' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
+        const all = chainStore(); all[id] = { id, name:nm, courses:[myRef], updatedAt:Date.now() }; saveChains(all);
+        toast('Started "' + nm + '" — find it in the Multi course tab');
+    } },
+    { label:'Close' },
+  ]);
+}
+function chainCardEl(c){
+  const card = el('article', { className:'cc' });
+  const tb = el('button', { className:'thumb', type:'button', title:'Play ' + c.name });
+  const firstThumb = c.courses[0] && c.courses[0].thumb;
+  if (firstThumb) tb.appendChild(el('img', { src:firstThumb, alt:'Preview of ' + c.name, draggable:false }));
+  tb.onclick = () => playChain(c);
+  const body = el('div', { className:'cc-body' });
+  const pars = c.courses.map(r => r.par);
+  const totalP = pars.length && pars.every(p => p) ? pars.reduce((a, b) => a + b, 0) : null;
+  body.append(el('div', { className:'cc-title' }, c.name),
+    el('div', { className:'cc-meta' }, c.courses.length + (c.courses.length === 1 ? ' course' : ' courses') + (totalP ? '  |  Par ' + totalP : '  |  incomplete')));
+  const acts = el('div', { className:'cc-actions' });
+  const play = el('button', { className:'btn sm primary' }, 'Play'); play.disabled = c.courses.length < 2; play.onclick = () => playChain(c);
+  const editB = el('button', { className:'btn sm' }, 'Edit'); editB.onclick = () => openChainEditor(c);
+  const del = el('button', { className:'btn sm' }, 'Delete');
+  del.onclick = () => confirmModal('Delete this chain?', 'Delete "' + c.name + '"? The courses inside it are not deleted.', 'Delete', () => {
+    const all = chainStore(); delete all[c.id]; saveChains(all); renderMenu();
+  });
+  acts.append(play, editB, del); body.appendChild(acts); card.append(tb, body);
+  return card;
+}
+function openChainEditor(chain){
+  const all = chainStore();
+  const box = el('div');
+  const nameIn = el('input', { className:'text', maxLength:20, value:chain.name });
+  box.appendChild(nameIn);
+  const list = el('div'); box.appendChild(list);
+  function draw(){
+    list.innerHTML = '';
+    chain.courses.forEach((r, i) => {
+      const row = el('div', { className:'saved-row' });
+      row.appendChild(el('span', {}, (i + 1) + '. ' + r.name + (r.par ? ' (par ' + r.par + ')' : ' (incomplete)') + (r.source === 'online' ? ' — online' : '')));
+      const up = el('button', { className:'btn sm' }, '↑'); up.disabled = i === 0;
+      up.onclick = () => { [chain.courses[i - 1], chain.courses[i]] = [chain.courses[i], chain.courses[i - 1]]; draw(); };
+      const down = el('button', { className:'btn sm' }, '↓'); down.disabled = i === chain.courses.length - 1;
+      down.onclick = () => { [chain.courses[i + 1], chain.courses[i]] = [chain.courses[i], chain.courses[i + 1]]; draw(); };
+      const rm = el('button', { className:'btn sm' }, 'Remove'); rm.onclick = () => { chain.courses.splice(i, 1); draw(); };
+      row.append(up, down, rm); list.appendChild(row);
+    });
+    if (!chain.courses.length) list.appendChild(el('p', { className:'muted' }, 'No courses in this chain yet.'));
+  }
+  draw();
+  box.appendChild(el('p', { className:'muted' }, "Add a course to this chain from that course's own editor, using its Course Link button."));
+  modal('Edit chain', box, [
+    { label:'Save', cls:'primary', fn:() => {
+        chain.name = nameIn.value.trim().slice(0, 20) || chain.name;
+        chain.updatedAt = Date.now();
+        all[chain.id] = chain; saveChains(all); renderMenu();
+    } },
+    { label:'Close' },
+  ]);
+}
+async function playChain(chain){
+  if (chain.courses.length < 2){ toast('Add at least one more course to this chain first'); return; }
+  notify('Loading ' + chain.courses.length + ' courses...');
+  try {
+    const allHoles = [], bounds = [];
+    for (const ref of chain.courses){
+      let obj;
+      if (ref.source === 'local'){ const rec = deviceRecs()[ref.id]; if (!rec) throw new Error('"' + ref.name + '" is missing from this device'); obj = JSON.parse(rec.data); }
+      else obj = await fetchOnlineData(ref.id);
+      const hs = parseHoles(obj, Infinity);
+      if (hs.some(h => !h.tee || !h.hole)) throw new Error('"' + ref.name + '" is not finished yet');
+      bounds.push({ name:ref.name, count:hs.length });
+      allHoles.push(...hs);
+    }
+    chainReturnWorld = saveWorld();
+    holes = allHoles; loadHoleIntoActive(0); chainBounds = bounds;
+    curCourse = { id:null, source:'chain', chainId:chain.id };
+    courseName = chain.name; role = 'viewer';
+    showGame(); startPlay();
+  } catch (e) { console.error(e); notify('Could not start that chain. ' + (e && e.message ? e.message : fbError(e))); }
+}
+
 /* ---- screens ---- */
 function showMenu(){
+  if (curCourse.source === 'chain' && chainReturnWorld){ restoreWorld(chainReturnWorld); chainReturnWorld = null; chainBounds = null; }
   screen = 'menu'; aim = null; dirty = true;
   $('menu').hidden = false; $('game').hidden = true;
   if (fbState === 'ok' && communityList === null) loadCommunity(); else renderMenu();
@@ -1414,23 +1860,33 @@ function resetBall(){
   $('result').classList.remove('show');
 }
 function startPlay(){
-  if (!tee || !hole){
-    toast(!tee && !hole ? 'Place a tee spot and a hole first' : !tee ? 'Place a tee spot first' : 'Place a hole first');
-    return;
-  }
-  mode = 'play'; ensureBuilt(); resetBall(); syncUI();
+  commitHole();
+  const badIdx = holes.findIndex(h => !h.tee || !h.hole);
+  if (badIdx !== -1){ toast(holes.length > 1 ? 'Hole ' + (badIdx + 1) + ' needs a tee spot and a hole' : 'Place a tee spot and a hole first'); return; }
+  editHoleBeforePlay = curHole;
+  mode = 'play'; ensureBuilt();
+  round = { scores: players.map(() => holes.map(() => null)), playerIdx:0, holeIdx:0 };
+  loadHoleIntoActive(0); rollWind(); resetBall(); syncUI();
 }
-function stopPlay(){ if (role !== 'editor') return; mode = 'edit'; aim = null; $('result').classList.remove('show'); syncUI(); }
+function stopPlay(){
+  if (role !== 'editor') return;
+  mode = 'edit'; aim = null; round = null; $('result').classList.remove('show');
+  loadHoleIntoActive(editHoleBeforePlay); syncUI();
+}
 function setRole(r){
   if (r === role) return;
   if (r === 'viewer'){
-    if (!tee || !hole){ toast('Add a tee spot and a hole before viewing'); return; }
-    role = 'viewer'; startPlay();
-  } else { role = 'editor'; mode = 'edit'; aim = null; $('result').classList.remove('show'); dirty = true; syncUI(); }
+    if (!allHolesReady()){ toast('Every hole needs a tee spot and a hole before viewing'); return; }
+    role = 'viewer'; chainBounds = null; startPlay();
+  } else {
+    role = 'editor'; mode = 'edit'; aim = null; round = null; $('result').classList.remove('show');
+    loadHoleIntoActive(editHoleBeforePlay); syncUI();
+    if (curCourse.source === 'online' && !isOwner()) toast('Not your course: Publish saves your own copy');
+  }
 }
 
 function shoot(ux, uy, p){
-  const club = currentClub(), lie = clamp(getT(ball.x, ball.y), 0, 6);
+  const club = currentClub(), lie = clamp(getT(ball.x, ball.y), 0, 7);
   ball.lx = ball.x; ball.ly = ball.y; strokes++;
   if (club === 'driver'){
     const c = carryOf(p) * LIE_PW[lie], Tt = Math.round(18 + 22*p), v = c / Tt;
@@ -1453,7 +1909,7 @@ function penalty(kind){
 function stopBall(){ ball.vx = ball.vy = 0; ball.z = 0; ball.air = false; ball.moving = false; }
 function settle(){
   if (Math.hypot(ball.vx, ball.vy) >= .06) return;
-  const t = clamp(getT(ball.x, ball.y), 0, 6);
+  const t = clamp(getT(ball.x, ball.y), 0, 7);
   if (slopeMagAt(ball.x, ball.y) < STATIC[t]) stopBall();
 }
 
@@ -1498,7 +1954,7 @@ function land(){
   ball.air = false; ball.z = 0;
   const tt = getT(ball.x, ball.y);
   if (tt === T.WATER){ penalty('water'); return; }
-  if (tt === T.VOID || tt < 0 || ball.x < 2 || ball.y < 2 || ball.x >= W-2 || ball.y >= H-2){ penalty('oob'); return; }
+  if (tt === T.VOID || tt === T.MOUNTAIN || tt < 0 || ball.x < 2 || ball.y < 2 || ball.x >= W-2 || ball.y >= H-2){ penalty('oob'); return; }
   const k = LAND[tt] || 0;
   ball.vx *= k; ball.vy *= k;
   if (tt === T.SAND) spawnBurst(ball.x, ball.y, 12, ['#e8d08e', '#d4b874', '#f4e4ae'], 1.1, .8);
@@ -1508,12 +1964,13 @@ function land(){
 }
 function stepBall(){
   if (ball.holed) return;
-  if (ball.sink > 0){ ball.sink++; if (ball.sink > 36) finishHole(); return; }
+  if (ball.sink > 0){ ball.sink++; if (ball.sink > 36) onHoleDone(); return; }
   if (!ball.moving) return;
   if (ball.air){
     ball.t++;
     const u = ball.t / ball.T;
     ball.z = 4 * ball.H * u * (1 - u);
+    ball.vx += wind.dx * WIND_K * wind.mag; ball.vy += wind.dy * WIND_K * wind.mag;
     if (moveBall(Math.max(1, Math.ceil(Math.hypot(ball.vx, ball.vy))), true)) return;
     if (ball.air && ball.t >= ball.T) land();
     return;
@@ -1522,7 +1979,7 @@ function stepBall(){
   ball.vx -= SLOPE_K * gxA[si]; ball.vy -= SLOPE_K * gyA[si];
   if (moveBall(Math.max(1, Math.ceil(Math.hypot(ball.vx, ball.vy))), false)) return;
   if (!ball.moving) return;
-  const f = FRIC[clamp(getT(ball.x, ball.y), 0, 6)];
+  const f = FRIC[clamp(getT(ball.x, ball.y), 0, 7)];
   ball.vx *= f; ball.vy *= f;
   settle();
 }
@@ -1531,18 +1988,72 @@ function scoreName(s, par){
   const d = s - par;
   return d <= -3 ? 'Albatross!' : d === -2 ? 'Eagle!' : d === -1 ? 'Birdie!' : d === 0 ? 'Par' : d === 1 ? 'Bogey' : d === 2 ? 'Double bogey' : '+' + d;
 }
-function finishHole(){
-  ball.holed = true;
-  const par = calcPar(), r = $('result');
-  r.innerHTML = '';
+function cardOverlay(title, bodyNodes, buttons){
+  const r = $('result'); r.innerHTML = '';
   const card = el('div', { className:'card' });
-  card.append(el('h3', {}, scoreName(strokes, par)), el('p', {}, strokes + (strokes === 1 ? ' stroke' : ' strokes') + ', par ' + par));
+  card.appendChild(el('h3', {}, title));
+  bodyNodes.forEach(n => card.appendChild(n));
+  const row = el('div', { className:'row' });
+  buttons.forEach(b => { const btn = el('button', { className:'btn ' + (b.cls || '') }, b.label); btn.onclick = b.fn; row.appendChild(btn); });
+  card.appendChild(row); r.appendChild(card); r.classList.add('show');
+}
+function showTurnCard(cont){
+  const p = players[round.playerIdx - 1], next = players[round.playerIdx];
+  cardOverlay('Nice one, ' + p.name + '!', [el('p', {}, p.name + ' scored ' + strokes + ' on Hole ' + (round.holeIdx + 1) + '. ' + next.name + ' is up.')],
+    [{ label:'Continue', cls:'primary', fn:() => { $('result').classList.remove('show'); cont(); syncUI(); } }]);
+}
+function showHoleSummary(cont){
+  const n = round.holeIdx, box = el('div');
+  players.forEach((p, i) => box.appendChild(el('p', {}, p.name + ': ' + round.scores[i][n])));
+  let title = 'Hole ' + (n + 1) + ' complete', btn = 'Next hole';
+  const cur = chainLocate(n), nxt = chainLocate(n + 1);
+  if (cur && nxt && cur.courseIdx !== nxt.courseIdx){ title = cur.courseName + ' complete!'; btn = 'Next: ' + nxt.courseName; }
+  else if (cur) title = cur.courseName + ' - hole ' + (cur.holeIdx + 1) + ' complete';
+  cardOverlay(title, [box],
+    [{ label:btn, cls:'primary', fn:() => { $('result').classList.remove('show'); cont(); syncUI(); } }]);
+}
+function showFinalResults(){
+  ball.holed = true;
+  const tp = totalPar();
+  const totals = players.map((p, i) => round.scores[i].reduce((s, v) => s + (v || 0), 0));
+  const solo = players.length === 1;
+  const r = $('result'); r.innerHTML = '';
+  const card = el('div', { className:'card' });
+  if (solo){
+    const improved = curCourse.id ? setBestIfBetter(curCourse.id, totals[0]) : false;
+    const b = curCourse.id ? bestFor(curCourse.id) : null;
+    card.append(
+      el('h3', {}, scoreName(totals[0], tp)),
+      el('p', {}, totals[0] + (totals[0] === 1 ? ' stroke' : ' strokes') + ', par ' + tp
+        + (b !== null ? (improved ? '  |  New best!' : '  |  Best: ' + b) : ''))
+    );
+  } else {
+    const order = players.map((p, i) => ({ name:p.name, total:totals[i] })).sort((a, b) => a.total - b.total);
+    card.appendChild(el('h3', {}, chainBounds ? 'Circuit complete!' : 'Round complete!'));
+    order.forEach((o, i) => card.appendChild(el('p', {},
+      '#' + (i + 1) + '  ' + o.name + '  —  ' + o.total + (tp ? '  (' + (o.total - tp >= 0 ? '+' : '') + (o.total - tp) + ')' : ''))));
+  }
   const row = el('div', { className:'row' });
   const again = el('button', { className:'btn primary' }, 'Play again'), rev = el('button', { className:'btn' }, 'Leave a review');
-  again.onclick = () => { resetBall(); syncUI(); }; rev.onclick = openReviews;
+  again.onclick = () => { $('result').classList.remove('show'); startPlay(); }; rev.onclick = openReviews;
   row.append(again, rev);
   if (role === 'editor'){ const ed = el('button', { className:'btn' }, 'Edit course'); ed.onclick = stopPlay; row.append(ed); }
   card.appendChild(row); r.appendChild(card); r.classList.add('show');
+}
+function onHoleDone(){
+  ball.holed = true;
+  round.scores[round.playerIdx][round.holeIdx] = strokes;
+  if (round.playerIdx < players.length - 1){
+    round.playerIdx++;
+    showTurnCard(() => resetBall());
+  } else if (round.holeIdx < holes.length - 1){
+    showHoleSummary(() => {
+      round.playerIdx = 0; round.holeIdx++;
+      loadHoleIntoActive(round.holeIdx); rollWind(); resetBall();
+    });
+  } else {
+    showFinalResults();
+  }
 }
 
 /* ================================================================== *
@@ -1633,11 +2144,23 @@ $('hstep').oninput = e => { hstep = +e.target.value; syncUI(); };
 $('edgeBtn').onclick = () => { hardEdge = !hardEdge; syncUI(); };
 $('nameIn').oninput = e => { courseName = e.target.value; changed = true; setText('gTitle', courseName || 'Untitled'); };
 $('undoBtn').onclick = undo; $('redoBtn').onclick = redo;
+$('addHoleBtn').onclick = () => {
+  if (holes.length >= MAX_HOLES) return;
+  commitHole(); holes.push(blankHole(T.VOID)); loadHoleIntoActive(holes.length - 1); changed = true; syncUI(); toast('Added hole ' + holes.length);
+};
+$('delHoleBtn').onclick = () => {
+  if (holes.length <= 1) return;
+  confirmModal('Delete this hole?', 'Delete Hole ' + (curHole + 1) + '? This cannot be undone.', 'Delete', () => {
+    holes.splice(curHole, 1); loadHoleIntoActive(Math.min(curHole, holes.length - 1)); changed = true; syncUI(); toast('Hole deleted');
+  });
+};
+$('playersBtn').onclick = openPlayers;
 $('saveBtn').onclick = saveLocal;
 $('pubBtn').onclick = () => publishOnline(false);
 $('pubNewBtn').onclick = () => publishOnline(true);
 $('shareBtn').onclick = openShare;
-$('playBtn').onclick = startPlay;
+$('linkBtn').onclick = openCourseLink;
+$('playBtn').onclick = () => { chainBounds = null; startPlay(); };
 $('tabEdit').onclick = () => { if (mode !== 'edit') stopPlay(); };
 $('tabPlay').onclick = () => { if (mode !== 'play') startPlay(); };
 $('restartBtn').onclick = () => { resetBall(); syncUI(); };
@@ -1650,13 +2173,30 @@ $('menuBtn').onclick = () => {
 document.querySelectorAll('.sfx').forEach(b => b.onclick = () => { sfxOn = !sfxOn; document.querySelectorAll('.sfx').forEach(x => x.textContent = sfxOn ? 'Sound on' : 'Sound off'); });
 $('tabCommunity').onclick = () => { menuTab = 'community'; renderMenu(); };
 $('tabDevice').onclick = () => { menuTab = 'device'; renderMenu(); };
+$('tabChains').onclick = () => { menuTab = 'chains'; renderMenu(); };
 $('mNew').onclick = openNew; $('mImport').onclick = openImport;
+$('authBtn').onclick = () => user ? openAccount() : openSignIn();
 $('mRefresh').onclick = () => { if (fbState === 'ok') loadCommunity(); else if (fbState === 'fail') initOnline(); else renderMenu(); };
 
 function setText(id, v){ const e = $(id); if (e._v !== v){ e.textContent = v; e._v = v; } }
+function renderHoleTabs(){
+  const c = $('holeTabs'); c.innerHTML = '';
+  holes.forEach((h, i) => {
+    const ready = i === curHole ? (tee && hole) : (h.tee && h.hole);
+    const b = el('button', { className:'btn sm' + (i === curHole ? ' on' : '') }, 'Hole ' + (i + 1) + (ready ? '' : ' !'));
+    b.onclick = () => { if (i !== curHole) checkoutHole(i); syncUI(); };
+    c.appendChild(b);
+  });
+  $('addHoleBtn').disabled = holes.length >= MAX_HOLES;
+  $('delHoleBtn').disabled = holes.length <= 1;
+}
 function syncUI(){
   const editor = role === 'editor', edit = mode === 'edit' && editor;
   $('editPanel').hidden = !edit; $('playPanel').hidden = edit;
+  $('roleSeg').hidden = curCourse.source === 'chain';
+  renderHoleTabs();
+  $('playersBtn').textContent = 'Players (' + players.length + ')';
+  $('playersBtn').disabled = mode === 'play';
   document.querySelectorAll('#roleSeg .btn').forEach(b => b.classList.toggle('on', b.dataset.role === role));
   $('modeTabs').hidden = !editor; $('backBtn').hidden = !editor;
   $('tabEdit').classList.toggle('on', edit); $('tabPlay').classList.toggle('on', !edit);
@@ -1674,25 +2214,30 @@ function syncUI(){
   if (document.activeElement !== $('nameIn')) $('nameIn').value = courseName;
   setText('gTitle', courseName || 'Untitled');
   $('undoBtn').disabled = !undoStack.length; $('redoBtn').disabled = !redoStack.length;
-  const online = curCourse.source === 'online';
-  $('pubBtn').textContent = online ? 'Update online' : 'Publish online';
-  $('pubNewBtn').hidden = !online;
+  const online = curCourse.source === 'online', owned = isOwner();
+  $('pubBtn').textContent = online ? (owned ? 'Update online' : 'Publish as new') : 'Publish online';
+  $('pubNewBtn').hidden = !(online && owned);
   $('pubBtn').disabled = pubBusy; $('pubNewBtn').disabled = pubBusy;
-  const par = calcPar();
+  const par = calcPar(), tp = totalPar();
   $('status').innerHTML =
+    'Hole ' + (curHole + 1) + ' of ' + holes.length + '<br>' +
     'Tee: <b class="' + (tee ? 'ok' : '') + '">' + (tee ? 'set' : 'not set') + '</b><br>' +
     'Hole: <b class="' + (hole ? 'ok' : '') + '">' + (hole ? 'set' : 'not set') + '</b><br>' +
-    'Par: <b>' + (par || '-') + '</b>';
+    'This hole, par: <b>' + (par || '-') + '</b><br>' +
+    'Course par: <b>' + (tp === null ? 'incomplete' : tp) + '</b>';
   $('hint').textContent = !edit
-    ? (editor ? 'Drag back from anywhere and let go to swing. Walls bounce the ball and downhill rolls faster. Keys: R restart, C club, E edit.'
-              : 'Viewer mode: drag back from anywhere and let go to swing. Walls bounce the ball and downhill rolls faster. Press Reviews to leave a comment.')
+    ? (editor ? 'Drag back from anywhere and let go to swing. Wind pushes shots in the air, walls bounce the ball, and downhill rolls faster. Keys: R restart, C club, E edit.'
+              : 'Viewer mode: drag back from anywhere and let go to swing. Wind pushes shots in the air. Press Reviews to leave a comment.')
     : (tool === 'deco' || tool === 'undeco')
       ? 'Click to place one decoration. Dragging does not place more. Right-click removes the nearest one.'
-      : 'Drag to paint. Right-click erases to void (or reverses raise and lower). Keys: B brush, F fill, R raise, L lower, G flatten, T tee, H hole, D decorate, 1-7 terrain, [ ] size, Ctrl+Z undo.';
+      : 'Drag to paint. Right-click erases to void (or reverses raise and lower). Switch holes above, or add up to 18. Keys: B brush, F fill, R raise, L lower, G flatten, T tee, H hole, D decorate, 1-8 terrain, [ ] size, Ctrl+Z undo.';
   cv.style.cursor = edit ? 'crosshair' : 'grab';
   const heat = isHeightTool(tool) && edit;
   if (heat !== lastHeat){ lastHeat = heat; dirty = true; }
-  if (!edit) { setText('pName', courseName); setText('pPar', String(par || '-')); }
+  if (!edit) {
+    setText('pName', courseName); setText('pPar', String(par || '-'));
+    if (round) setText('pTurn', turnLine());
+  }
 }
 function updateHUD(){
   if (mode !== 'play') return;
@@ -1700,6 +2245,10 @@ function updateHUD(){
   const lie = getT(ball.x, ball.y);
   setText('pLie', lie >= 0 ? LIE_NAMES[lie] : '-');
   setText('pDist', Math.round(Math.hypot(ball.x - hole.x - .5, ball.y - hole.y - .5) * 2.2) + ' yd');
+  setText('pWind', windLabel());
+  if (round) setText('pTurn', turnLine());
+  const b = curCourse.id ? bestFor(curCourse.id) : null;
+  setText('pBest', b === null ? '-' : String(b));
 }
 
 /* ---- keyboard ---- */
@@ -1714,7 +2263,7 @@ window.addEventListener('keydown', e => {
     if (e.ctrlKey || e.metaKey || e.altKey) return;
     if (k === 'b') tool = 'brush'; else if (k === 'f') tool = 'fill'; else if (k === 't') tool = 'tee'; else if (k === 'h') tool = 'hole';
     else if (k === 'r') tool = 'raise'; else if (k === 'l') tool = 'lower'; else if (k === 'g') tool = 'flat'; else if (k === 'd') tool = 'deco';
-    else if (k >= '1' && k <= '7'){ cur = +k - 1; if (tool !== 'brush' && tool !== 'fill') tool = 'brush'; }
+    else if (k >= '1' && k <= '8'){ cur = +k - 1; if (tool !== 'brush' && tool !== 'fill') tool = 'brush'; }
     else if (k === '[') brushSize = Math.max(1, brushSize - 1);
     else if (k === ']') brushSize = Math.min(20, brushSize + 1);
     else return;

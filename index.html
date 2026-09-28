@@ -166,6 +166,7 @@ input[type=range]{width:100%;accent-color:var(--accent);margin:4px 0 0}
         <button class="btn primary" id="mNew">New course</button>
         <button class="btn" id="mImport">Import code</button>
         <button class="btn" id="mRefresh">Refresh</button>
+        <button class="btn" id="achBtn">Trophies</button>
         <button class="btn" id="authBtn">Sign in</button>
         <button class="btn sfx">Sound on</button>
       </div>
@@ -314,7 +315,7 @@ input[type=range]{width:100%;accent-color:var(--accent);margin:4px 0 0}
  *  CONSTANTS
  * ================================================================== */
 const W = 240, H = 150;
-const T = { ROUGH:0, FAIRWAY:1, GREEN:2, SAND:3, WATER:4, TREE:5, VOID:6, MOUNTAIN:7 };
+const T = { ROUGH:0, FAIRWAY:1, GREEN:2, SAND:3, WATER:4, TREE:5, VOID:6, MOUNTAIN:7, ICE:8 };
 const TERRAINS = [
   { id:0, name:'Rough',   color:'#3a7a3c' },
   { id:1, name:'Fairway', color:'#6eb64f' },
@@ -323,7 +324,8 @@ const TERRAINS = [
   { id:4, name:'Water',   color:'#3a78c8' },
   { id:5, name:'Trees',   color:'#1e5430' },
   { id:6, name:'Void (walls)', color:'#1a2622' },
-  { id:7, name:'Mountain', color:'#8c8a84', wide:true },
+  { id:7, name:'Mountain', color:'#8c8a84' },
+  { id:8, name:'Ice', color:'#bfe6f5', wide:true },
 ];
 // solid = footprint [x0,y0,x1,y1] relative to the deco's base point
 const DECOS = [
@@ -342,16 +344,16 @@ const DECOS = [
 ];
 const MAX_DECOS = 150;
 const MAX_HOLES = 18;
-const LIE_NAMES = ['Rough','Fairway','Green','Sand','Water','Trees','Void','Mountain'];
-const FRIC   = [0.935, 0.972, 0.978, 0.86, 0.9, 0.9, 0.9, 0.9];
-const LAND   = [0.28, 0.42, 0.40, 0.03, 0, 0, 0, 0];
-const LIE_PW = [0.85, 1, 1, 0.65, 1, 1, 1, 1];
-const STATIC = [0.02, 0.014, 0.01, 0.045, 0, 0, 0, 0];
+const LIE_NAMES = ['Rough','Fairway','Green','Sand','Water','Trees','Void','Mountain','Ice'];
+const FRIC   = [0.935, 0.972, 0.978, 0.86, 0.9, 0.9, 0.9, 0.9, 0.99];
+const LAND   = [0.28, 0.42, 0.40, 0.03, 0, 0, 0, 0, 0.6];
+const LIE_PW = [0.85, 1, 1, 0.65, 1, 1, 1, 1, 1];
+const STATIC = [0.02, 0.014, 0.01, 0.045, 0, 0, 0, 0, 0.003];
 const TREE_H = 6, WALL_H = 5, DECO_H = 7, MOUNTAIN_H = 9;
 const SLOPE_K = 0.02;
 const HMAX = 60;
 const SINK_MAX_SPEED = 2.2;
-const K_COURSES = 'pixellinks:courses2', K_LEGACY = 'pixellinks:courses', K_COMMENTS = 'pixellinks:comments', K_NAME = 'pixellinks:player', K_BEST = 'pixellinks:best', K_CHAINS = 'pixellinks:chains';
+const K_COURSES = 'pixellinks:courses2', K_LEGACY = 'pixellinks:courses', K_COMMENTS = 'pixellinks:comments', K_NAME = 'pixellinks:player', K_BEST = 'pixellinks:best', K_CHAINS = 'pixellinks:chains', K_ACH = 'pixellinks:ach';
 const WIND_K = 0.0065, WIND_NAMES = ['Calm', 'Light air', 'Breezy', 'Windy'];
 const isHeightTool = t => t === 'raise' || t === 'lower' || t === 'flat';
 
@@ -385,6 +387,8 @@ let chainBounds = null, chainReturnWorld = null;
 
 const ball = { x:0, y:0, vx:0, vy:0, z:0, air:false, t:0, T:1, H:10, sink:0, holed:false, moving:false, lx:0, ly:0 };
 let strokes = 0, clubMode = 'auto', aim = null;
+let swing = null, lastFace = 1;
+const SWING_IMPACT = 7, SWING_END = 24;
 const wind = { dx:0, dy:0, mag:0 };
 const parts = [];
 
@@ -405,6 +409,29 @@ function rollWind(){ const a = Math.random() * Math.PI * 2, m = Math.random(); w
 function windLabel(){ return WIND_NAMES[clamp(Math.floor(wind.mag * WIND_NAMES.length), 0, WIND_NAMES.length - 1)]; }
 function bestFor(id){ const v = lsGet(K_BEST, {})[id]; return Number.isFinite(v) ? v : null; }
 function setBestIfBetter(id, s){ if (!id) return false; const all = lsGet(K_BEST, {}); if (!(id in all) || s < all[id]){ all[id] = s; lsSet(K_BEST, all); return true; } return false; }
+const ACH = [
+  { id:'first', name:'First Round', desc:'Finish a round' },
+  { id:'ace', name:'Ace!', desc:'Hole in one' },
+  { id:'birdie', name:'Birdie Hunter', desc:'Beat par on a hole' },
+  { id:'under', name:'Under Par', desc:'Finish a solo round under par' },
+  { id:'splash', name:'Fish Finder', desc:'Sink 5 balls in water' },
+  { id:'ice', name:'Cold Feet', desc:'Hole out with a shot that started on ice' },
+  { id:'crowd', name:'Crowd Pleaser', desc:'Finish a round with 3+ players' },
+  { id:'circuit', name:'Grand Tour', desc:'Finish a multi-course chain' },
+];
+const achState = () => lsGet(K_ACH, { unlocked:{}, splash:0 });
+function unlock(id){
+  const a = achState(); if (a.unlocked[id]) return;
+  a.unlocked[id] = Date.now(); lsSet(K_ACH, a);
+  const d = ACH.find(x => x.id === id); toast('Achievement: ' + d.name + '!'); beep(660, .12, 'square', .04); beep(880, .2, 'square', .04, 0, .12);
+}
+function openAchievements(){
+  const a = achState(), box = el('div');
+  box.appendChild(el('p', { className:'muted' }, Object.keys(a.unlocked).length + ' of ' + ACH.length + ' unlocked (saved on this device)'));
+  ACH.forEach(d => { const got = !!a.unlocked[d.id]; const r = el('div', { className:'review' });
+    r.append(el('div', { className:'rh' }, (got ? '★ ' : '☆ ') + d.name), el('div', { className:'rt' }, d.desc)); if (!got) r.style.opacity = .55; box.appendChild(r); });
+  modal('Trophies', box, [{ label:'Close' }]);
+}
 function nearMarker(x, y){
   for (const m of [tee, hole]) if (m && (x-m.x)*(x-m.x) + (y-m.y)*(y-m.y) < 16) return true;
   return false;
@@ -510,6 +537,7 @@ const C = {
   wallTop:[224,192,134], wallFace:[168,124,78], wall2:[112,80,52],
   void:[24,36,31], voidD:[17,27,24],
   rock:[132,128,122], rockD:[104,100,96], rockL:[160,156,148], rockRim:[74,70,66],
+  ice1:[188,226,244], ice2:[204,236,248], iceS:[244,251,255], iceE:[128,188,216],
   snow:[236,240,244], snowL:[255,255,255], snowD:[204,212,220],
 };
 
@@ -650,6 +678,9 @@ function buildBase(){
       const shore = n => n !== T.WATER && n !== T.TREE && n !== T.VOID && n !== T.MOUNTAIN;
       if (shore(nL) || shore(nR) || shore(nU) || shore(nD)) c = C.foam;
       else waterIdx.push(i);
+    } else if (t === T.ICE){
+      c = ((x*2 + y) % 9 === 0 || h > 240) ? C.iceS : (h < 90 ? C.ice2 : C.ice1);
+      if (nL !== t || nR !== t || nU !== t || nD !== t) c = C.iceE;
     } else if (t === T.MOUNTAIN){
       if (!mtAt(x, y-1)) c = C.rockRim;
       else if (!mtAt(x-1, y) || !mtAt(x-1, y-1)) c = C.rockRim;
@@ -875,12 +906,83 @@ function drawWindIndicator(){
   const hx = ox + wind.dx * len, hy = oy + wind.dy * len;
   rect(hx - wind.dy, hy + wind.dx, 1, 1, '#eef6ea'); rect(hx + wind.dy, hy - wind.dx, 1, 1, '#eef6ea');
 }
+let react = null, golferPos = null;
+const REACT_LEN = { ace:135, sulk:100, sand:70, near:135 };
+function startReact(kind){
+  if (!golferPos || mode !== 'play') return;
+  react = { kind, t:0 };
+  if (kind === 'near') beep(300, .3, 'triangle', .04, -120);
+  if (kind === 'sand') beep(180, .2, 'sawtooth', .025, -60);
+}
+function stepReact(){
+  if (!react) return;
+  react.t++;
+  if (react.kind === 'ace' && (react.t === 36 || react.t === 84)) spawnBurst(golferPos.x, golferPos.y - 9, 22, ['#ffd23f', '#e8443a', '#fff', '#3fb0ff', '#7be07b'], 1.8, 2.2, 2);
+  if (react.t >= REACT_LEN[react.kind]) react = null;
+}
+function drawDude(o){
+  const f = o.f, gx = o.gx, jy = o.jy || 0, y = o.gy + jy, skin = o.skin || '#f0c8a0';
+  rect(gx - 2, o.gy, 5, 1, 'rgba(0,0,0,.3)');
+  const lh = o.slump ? 2 : 3, top = y - lh - 3;
+  rect(gx - 1, y - lh, 1, lh, '#2b3a67'); rect(gx + 1, y - lh, 1, lh, '#2b3a67');
+  rect(gx - 1, top, 3, 3, '#e2443a');
+  const hy = top - 3 + (o.headDy || 0), hx = gx - 1 + (o.hx || 0);
+  rect(hx, hy, 3, 3, skin); rect(hx, hy, 3, 1, '#ffffff'); rect(hx + (f > 0 ? 3 : -1), hy + 1, 1, 1, '#ffffff');
+  if (o.armsUp){
+    const at = hy - 2;
+    rect(gx - 2, at, 1, top + 2 - at, skin); rect(gx + 2, at, 1, top + 2 - at, skin);
+    rect(gx + 2, at - 5, 1, 5, '#e6e6ea'); rect(gx + 2, at - 6, 2, 1, '#3a3a44');
+  } else {
+    const hx2 = gx + f, hy2 = top + 1, dx = f * Math.sin(o.phi), dy = Math.cos(o.phi);
+    rect(hx2, hy2, 1, 1, skin);
+    for (let sp = 1; sp <= 7; sp++) rect(Math.round(hx2 + dx * sp), Math.round(hy2 + dy * sp), 1, 1, '#e6e6ea');
+    rect(Math.round(hx2 + dx * 8), Math.round(hy2 + dy * 8), 2, 1, '#3a3a44');
+  }
+}
+function bubbleBg(x, y, w, h){ rect(x, y, w, h, 'rgba(18,22,30,.9)'); }
+function drawExcl(x, y){ bubbleBg(x - 3, y - 2, 7, 11); rect(x, y, 1, 5, '#ffd23f'); rect(x, y + 7, 1, 1, '#ffd23f'); rect(x - 1, y, 3, 1, '#ffd23f'); }
+function drawDots(x, y, n, color){ bubbleBg(x - 6, y - 1, 13, 5); for (let i = 0; i < n; i++) rect(x - 4 + i * 4, y, 2, 2, color); }
+function drawReact(now){
+  const g = golferPos, t = react.t, k = react.kind;
+  const base = { gx:g.x, gy:g.y, f:g.f, phi:0.6 };
+  const bx = g.x, by = g.y - 19;
+  if (k === 'ace'){
+    if (t < 36){ drawDude({ ...base, jy:(t % 8 < 4) ? 0 : -1 }); if (t > 3) drawExcl(bx, by); }
+    else { const u = t - 36; drawDude({ ...base, f:(Math.floor(u / 9) % 2) ? -g.f : g.f, armsUp:true, jy:-Math.round(Math.abs(Math.sin(u * 0.32)) * 8) }); }
+  } else if (k === 'sulk'){
+    drawDude({ ...base, phi:0, slump:true, headDy:1, hx:-g.f });
+    if (t > 4) drawDots(bx, by + 2, Math.min(3, 1 + Math.floor((t - 4) / 12)), ((t > 50 && Math.floor(t / 10) % 2) ? '#7a8594' : '#e8eef4'));
+  } else if (k === 'sand'){
+    drawDude({ ...base, phi:1.3, skin:'#e8574a', jy:(t % 16 < 3) ? -2 : 0 });
+    if (t > 3) drawDots(bx, by + 2, Math.min(3, 1 + Math.floor((t - 3) / 9)), '#ff4a3a');
+  } else if (k === 'near'){
+    if (t < 50) drawDude({ ...base, f:(Math.floor(t / 9) % 2) ? -g.f : g.f, armsUp:true, jy:-Math.round(Math.abs(Math.sin(t * 0.34)) * 7) });
+    else { drawDude({ ...base, phi:0.3, hx:g.f }); if (t > 60) drawDots(bx, by + 2, Math.min(3, 1 + Math.floor((t - 60) / 14)), '#e8eef4'); }
+  }
+}
+function drawGolfer(now){
+  if (react){ drawReact(now); return; }
+  if (ball.holed || ball.sink > 0) return;
+  let f = lastFace, phi = 0.6, back = false;
+  if (swing){
+    f = swing.f;
+    if (swing.t <= SWING_IMPACT){ const k = swing.t / SWING_IMPACT; phi = swing.back + (0.6 - swing.back) * k * k; }
+    else { const k = Math.min(1, (swing.t - SWING_IMPACT) / (SWING_END - SWING_IMPACT)); phi = 0.6 + 1.8 * (1 - (1 - k) * (1 - k)); }
+  } else if (canAim()){
+    if (aim){
+      const dx = ball.x - aim.x, dy = ball.y - aim.y, d = Math.hypot(dx, dy);
+      if (d >= 3){ f = dx >= 0 ? 1 : -1; lastFace = f; phi = 0.6 + (-2.7 - 0.6) * Math.min(1, d / maxDrag()); back = true; }
+    }
+  } else return;
+  const p = swing && golferPos ? golferPos : { x:Math.floor(ball.x - f * 5), y:Math.floor(ball.y + 1) };
+  drawDude({ gx:p.x, gy:p.y, f, phi, hx:back ? -f : 0 });
+}
 function drawAim(){
   if (!aim || !canAim()) return;
   const dx = ball.x - aim.x, dy = ball.y - aim.y, d = Math.hypot(dx, dy);
   if (d < 3) return;
   const p = Math.min(1, d / maxDrag()), ux = dx/d, uy = dy/d;
-  const club = currentClub(), lie = clamp(getT(ball.x, ball.y), 0, 7);
+  const club = currentClub(), lie = clamp(getT(ball.x, ball.y), 0, 8);
   let len;
   if (club === 'driver') len = carryOf(p) * LIE_PW[lie];
   else { const v = 0.35 + 2.05*p; len = Math.min(110, v / (1 - FRIC[lie]) * 0.9); }
@@ -941,6 +1043,7 @@ function render(now){
       }
       drawBallAt(bx, by, ball.z, s);
     }
+    drawGolfer(now);
     for (const d of below) drawDeco(d, now);
     if (hole) drawFlag(hole, now);
     drawAim();
@@ -1153,7 +1256,7 @@ function parseHoles(o, cap = MAX_HOLES){
   const ok = m => m && Number.isFinite(m.x) && Number.isFinite(m.y) ? { x:clamp(m.x|0, 0, W-1), y:clamp(m.y|0, 0, H-1) } : null;
   return list.slice(0, cap).map(hd => {
     if (!Array.isArray(hd.rle)) throw new Error('bad');
-    const t = rleDec(hd.rle, Uint8Array, 0, 7);
+    const t = rleDec(hd.rle, Uint8Array, 0, 8);
     const e = Array.isArray(hd.erle) ? rleDec(hd.erle, Int8Array, -HMAX, HMAX) : new Int8Array(W*H);
     const ds = [];
     if (Array.isArray(hd.decos)) for (const a of hd.decos.slice(0, MAX_DECOS)){
@@ -1852,11 +1955,11 @@ function drawHero(){
 /* ================================================================== *
  *  PLAY
  * ================================================================== */
-function canAim(){ return mode === 'play' && !ball.moving && ball.sink === 0 && !ball.holed; }
+function canAim(){ return mode === 'play' && !swing && !react && !ball.moving && ball.sink === 0 && !ball.holed; }
 function resetBall(){
   ball.x = tee.x + .5; ball.y = tee.y + .5; ball.vx = ball.vy = 0; ball.z = 0;
   ball.air = false; ball.sink = 0; ball.holed = false; ball.moving = false;
-  ball.lx = ball.x; ball.ly = ball.y; strokes = 0; aim = null; parts.length = 0;
+  ball.lx = ball.x; ball.ly = ball.y; strokes = 0; aim = null; swing = null; react = null; parts.length = 0;
   $('result').classList.remove('show');
 }
 function startPlay(){
@@ -1886,7 +1989,18 @@ function setRole(r){
 }
 
 function shoot(ux, uy, p){
-  const club = currentClub(), lie = clamp(getT(ball.x, ball.y), 0, 7);
+  lastFace = ux >= 0 ? 1 : -1;
+  swing = { t:0, ux, uy, p, f:lastFace, back:0.6 + (-2.7 - 0.6) * p };
+}
+function stepSwing(){
+  if (!swing) return;
+  swing.t++;
+  if (swing.t === SWING_IMPACT) launchShot(swing.ux, swing.uy, swing.p);
+  if (swing.t > SWING_END) swing = null;
+}
+function launchShot(ux, uy, p){
+  golferPos = { x:Math.floor(ball.x - swing.f * 5), y:Math.floor(ball.y + 1), f:swing.f };
+  const club = currentClub(), lie = clamp(getT(ball.x, ball.y), 0, 8);
   ball.lx = ball.x; ball.ly = ball.y; strokes++;
   if (club === 'driver'){
     const c = carryOf(p) * LIE_PW[lie], Tt = Math.round(18 + 22*p), v = c / Tt;
@@ -1900,16 +2014,21 @@ function shoot(ux, uy, p){
 function penalty(kind){
   strokes++;
   if (kind === 'water'){
+    startReact('sulk');
+    const a = achState(); a.splash = (a.splash || 0) + 1; lsSet(K_ACH, a); if (a.splash >= 5) unlock('splash');
     spawnBurst(ball.x, ball.y, 26, ['#b9dcff', '#fff', '#5a9be0'], 1.6, 1.5); sfx.splash(); toast('Splash! +1 stroke');
   } else {
     spawnBurst(ball.x, ball.y, 14, ['#ffd23f', '#fff'], 1.2, 1); sfx.oob(); toast('Out of bounds! +1 stroke');
   }
   ball.x = ball.lx; ball.y = ball.ly; ball.vx = ball.vy = 0; ball.z = 0; ball.air = false; ball.moving = false;
 }
-function stopBall(){ ball.vx = ball.vy = 0; ball.z = 0; ball.air = false; ball.moving = false; }
+function stopBall(){
+  ball.vx = ball.vy = 0; ball.z = 0; ball.air = false; ball.moving = false;
+  if (mode === 'play' && hole && !ball.holed && ball.sink === 0 && Math.hypot(ball.x - hole.x - .5, ball.y - hole.y - .5) < 7) startReact('near');
+}
 function settle(){
   if (Math.hypot(ball.vx, ball.vy) >= .06) return;
-  const t = clamp(getT(ball.x, ball.y), 0, 7);
+  const t = clamp(getT(ball.x, ball.y), 0, 8);
   if (slopeMagAt(ball.x, ball.y) < STATIC[t]) stopBall();
 }
 
@@ -1940,6 +2059,7 @@ function moveBall(n, air){
       const d = Math.hypot(nx - (hole.x + .5), ny - (hole.y + .5)), sp = Math.hypot(ball.vx, ball.vy);
       if (d < 2.6 && sp < SINK_MAX_SPEED){
         ball.sink = 1; ball.moving = false; ball.vx = ball.vy = 0; sfx.cup();
+        if (strokes === 1) startReact('ace');
         spawnBurst(hole.x + .5, hole.y - 4, 34, ['#ffd23f', '#e8443a', '#fff', '#3fb0ff', '#7be07b'], 2.2, 2.4, 2);
         return true;
       }
@@ -1957,14 +2077,15 @@ function land(){
   if (tt === T.VOID || tt === T.MOUNTAIN || tt < 0 || ball.x < 2 || ball.y < 2 || ball.x >= W-2 || ball.y >= H-2){ penalty('oob'); return; }
   const k = LAND[tt] || 0;
   ball.vx *= k; ball.vy *= k;
-  if (tt === T.SAND) spawnBurst(ball.x, ball.y, 12, ['#e8d08e', '#d4b874', '#f4e4ae'], 1.1, .8);
+  if (tt === T.SAND){ spawnBurst(ball.x, ball.y, 12, ['#e8d08e', '#d4b874', '#f4e4ae'], 1.1, .8); startReact('sand'); }
+  else if (tt === T.ICE) spawnBurst(ball.x, ball.y, 8, ['#f4fbff', '#bfe6f5'], 1, .6);
   else spawnBurst(ball.x, ball.y, 5, ['#5aa04c', '#3a7a3c'], .7, .5);
   sfx.bounce();
   settle();
 }
 function stepBall(){
   if (ball.holed) return;
-  if (ball.sink > 0){ ball.sink++; if (ball.sink > 36) onHoleDone(); return; }
+  if (ball.sink > 0){ ball.sink++; if (ball.sink > 36 && !react) onHoleDone(); return; }
   if (!ball.moving) return;
   if (ball.air){
     ball.t++;
@@ -1979,7 +2100,7 @@ function stepBall(){
   ball.vx -= SLOPE_K * gxA[si]; ball.vy -= SLOPE_K * gyA[si];
   if (moveBall(Math.max(1, Math.ceil(Math.hypot(ball.vx, ball.vy))), false)) return;
   if (!ball.moving) return;
-  const f = FRIC[clamp(getT(ball.x, ball.y), 0, 7)];
+  const f = FRIC[clamp(getT(ball.x, ball.y), 0, 8)];
   ball.vx *= f; ball.vy *= f;
   settle();
 }
@@ -2017,6 +2138,10 @@ function showFinalResults(){
   const tp = totalPar();
   const totals = players.map((p, i) => round.scores[i].reduce((s, v) => s + (v || 0), 0));
   const solo = players.length === 1;
+  unlock('first');
+  if (players.length >= 3) unlock('crowd');
+  if (chainBounds) unlock('circuit');
+  if (solo && tp && totals[0] < tp) unlock('under');
   const r = $('result'); r.innerHTML = '';
   const card = el('div', { className:'card' });
   if (solo){
@@ -2042,6 +2167,9 @@ function showFinalResults(){
 }
 function onHoleDone(){
   ball.holed = true;
+  const hp = calcPar();
+  if (strokes === 1) unlock('ace'); else if (hp && strokes < hp) unlock('birdie');
+  if (getT(ball.lx, ball.ly) === T.ICE) unlock('ice');
   round.scores[round.playerIdx][round.holeIdx] = strokes;
   if (round.playerIdx < players.length - 1){
     round.playerIdx++;
@@ -2174,6 +2302,7 @@ document.querySelectorAll('.sfx').forEach(b => b.onclick = () => { sfxOn = !sfxO
 $('tabCommunity').onclick = () => { menuTab = 'community'; renderMenu(); };
 $('tabDevice').onclick = () => { menuTab = 'device'; renderMenu(); };
 $('tabChains').onclick = () => { menuTab = 'chains'; renderMenu(); };
+$('achBtn').onclick = openAchievements;
 $('mNew').onclick = openNew; $('mImport').onclick = openImport;
 $('authBtn').onclick = () => user ? openAccount() : openSignIn();
 $('mRefresh').onclick = () => { if (fbState === 'ok') loadCommunity(); else if (fbState === 'fail') initOnline(); else renderMenu(); };
@@ -2230,7 +2359,7 @@ function syncUI(){
               : 'Viewer mode: drag back from anywhere and let go to swing. Wind pushes shots in the air. Press Reviews to leave a comment.')
     : (tool === 'deco' || tool === 'undeco')
       ? 'Click to place one decoration. Dragging does not place more. Right-click removes the nearest one.'
-      : 'Drag to paint. Right-click erases to void (or reverses raise and lower). Switch holes above, or add up to 18. Keys: B brush, F fill, R raise, L lower, G flatten, T tee, H hole, D decorate, 1-8 terrain, [ ] size, Ctrl+Z undo.';
+      : 'Drag to paint. Right-click erases to void (or reverses raise and lower). Switch holes above, or add up to 18. Keys: B brush, F fill, R raise, L lower, G flatten, T tee, H hole, D decorate, 1-9 terrain, [ ] size, Ctrl+Z undo.';
   cv.style.cursor = edit ? 'crosshair' : 'grab';
   const heat = isHeightTool(tool) && edit;
   if (heat !== lastHeat){ lastHeat = heat; dirty = true; }
@@ -2263,7 +2392,7 @@ window.addEventListener('keydown', e => {
     if (e.ctrlKey || e.metaKey || e.altKey) return;
     if (k === 'b') tool = 'brush'; else if (k === 'f') tool = 'fill'; else if (k === 't') tool = 'tee'; else if (k === 'h') tool = 'hole';
     else if (k === 'r') tool = 'raise'; else if (k === 'l') tool = 'lower'; else if (k === 'g') tool = 'flat'; else if (k === 'd') tool = 'deco';
-    else if (k >= '1' && k <= '8'){ cur = +k - 1; if (tool !== 'brush' && tool !== 'fill') tool = 'brush'; }
+    else if (k >= '1' && k <= '9'){ cur = +k - 1; if (tool !== 'brush' && tool !== 'fill') tool = 'brush'; }
     else if (k === '[') brushSize = Math.max(1, brushSize - 1);
     else if (k === ']') brushSize = Math.min(20, brushSize + 1);
     else return;
@@ -2291,7 +2420,7 @@ window.addEventListener('resize', fit);
 let last = performance.now(), acc = 0;
 function frame(now){
   acc += Math.min(100, now - last); last = now;
-  while (acc >= 16.667){ acc -= 16.667; if (screen === 'game' && mode === 'play') stepBall(); stepParticles(); }
+  while (acc >= 16.667){ acc -= 16.667; if (screen === 'game' && mode === 'play'){ stepReact(); stepSwing(); stepBall(); } stepParticles(); }
   if (screen === 'game'){ updateHUD(); render(now); }
   requestAnimationFrame(frame);
 }

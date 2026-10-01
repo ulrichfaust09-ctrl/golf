@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Pixel Links – Golf Course Maker</title>
+<title>Pixel Linkz</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
@@ -154,7 +154,7 @@ input[type=range]{width:100%;accent-color:var(--accent);margin:4px 0 0}
   <section id="menu">
     <div class="hero">
       <canvas id="heroCv" width="320" height="80" aria-hidden="true"></canvas>
-      <div class="hero-text"><h1>Pixel Links</h1><span>Build a course. Share it. Play it.</span></div>
+      <div class="hero-text"><h1>Pixel Linkz</h1><span>Build a course. Share it. Play it.</span></div>
     </div>
     <div class="menu-bar">
       <div class="tabs">
@@ -257,6 +257,19 @@ input[type=range]{width:100%;accent-color:var(--accent);margin:4px 0 0}
           </div>
 
           <div class="panel">
+            <h2>Moving hazards</h2>
+            <div class="grid2">
+              <button class="btn" data-tool="hazard" data-haz="spin">Spinner</button>
+              <button class="btn" data-tool="hazard" data-haz="slide">Slider</button>
+            </div>
+            <button class="btn wide" data-tool="unhazard" style="margin-top:10px">Remove</button>
+            <h2 style="margin:14px 0 4px">Speed <span id="hazSpeedVal" style="color:var(--ink)"></span></h2>
+            <input type="range" id="hazSpeed" min="1" max="5" value="3" aria-label="Hazard speed">
+            <button class="btn wide" id="hazAxisBtn" style="margin-top:12px">Slider: horizontal</button>
+            <p class="note">Click to place one. A spinner rotates in place; a slider slides back and forth. Right-click removes the nearest one.</p>
+          </div>
+
+          <div class="panel">
             <h2>Course</h2>
             <input class="text" id="nameIn" maxlength="20" aria-label="Course name">
             <div class="grid2">
@@ -299,6 +312,7 @@ input[type=range]{width:100%;accent-color:var(--accent);margin:4px 0 0}
           <div class="grid2" style="margin-bottom:18px">
             <button class="btn" id="restartBtn">Restart</button>
             <button class="btn primary" id="reviewsBtn">Reviews</button>
+            <button class="btn span2" id="lbBtn">Leaderboard</button>
             <button class="btn span2" id="backBtn">Back to editing</button>
           </div>
         </div>
@@ -343,6 +357,7 @@ const DECOS = [
   { name:'Parasol' },
 ];
 const MAX_DECOS = 150;
+const MAX_HAZARDS = 20;
 const MAX_HOLES = 18;
 const LIE_NAMES = ['Rough','Fairway','Green','Sand','Water','Trees','Void','Mountain','Ice'];
 const FRIC   = [0.935, 0.972, 0.978, 0.86, 0.9, 0.9, 0.9, 0.9, 0.99];
@@ -368,11 +383,14 @@ const stage = $('stage');
 let terrain = new Uint8Array(W*H);
 const elev = new Int8Array(W*H);
 let decos = [];
+let hazards = [];
 const decoSolid = new Uint8Array(W*H);
 let decoSorted = [];
 let tee = null, hole = null;
 let courseName = 'My course';
 let tool = 'brush', cur = 1, curDeco = 0, brushSize = 6, hstep = 6, hardEdge = false;
+let curHazKind = 'spin', curHazAxis = 'h', hazSpeed = 3;
+const HAZ_PERIOD = { 1:4.4, 2:3.2, 3:2.2, 4:1.5, 5:1.0 };
 let mode = 'edit', role = 'editor', screen = 'menu';
 let curCourse = { id:null, source:'new' };
 let changed = false;
@@ -443,13 +461,13 @@ const calcPar = () => parOf(tee, hole);
    above are always the currently checked-out hole; `holes[]` holds the rest. ---- */
 function blankHole(fill){
   const t = new Uint8Array(W*H); if (fill !== undefined) t.fill(fill);
-  return { terrain:t, elev:new Int8Array(W*H), decos:[], tee:null, hole:null, undo:[], redo:[] };
+  return { terrain:t, elev:new Int8Array(W*H), decos:[], hazards:[], tee:null, hole:null, undo:[], redo:[] };
 }
-function commitHole(){ holes[curHole] = { terrain, elev:elev.slice(), decos, tee, hole, undo:undoStack, redo:redoStack }; }
+function commitHole(){ holes[curHole] = { terrain, elev:elev.slice(), decos, hazards, tee, hole, undo:undoStack, redo:redoStack }; }
 function loadHoleIntoActive(i){
   curHole = i;
   const h = holes[i];
-  terrain = h.terrain; elev.set(h.elev); decos = h.decos.map(d => ({...d})); tee = h.tee; hole = h.hole;
+  terrain = h.terrain; elev.set(h.elev); decos = h.decos.map(d => ({...d})); hazards = (h.hazards || []).map(z => ({...z})); tee = h.tee; hole = h.hole;
   undoStack = h.undo || []; redoStack = h.redo || [];
   rebuildSolids(); dirty = true;
 }
@@ -1003,6 +1021,7 @@ function drawStaticSprites(now){
   if (hole) drawHole(hole);
   if (tee) drawTee(tee, true);
   for (const d of decoSorted) drawDeco(d, now);
+  drawHazards(now * 0.001);
   if (hole) drawFlag(hole, now);
 }
 function render(now){
@@ -1028,6 +1047,12 @@ function render(now){
       else if (tool === 'hole'){ ctx.globalAlpha = .6; const m = { x:hx, y:hy }; drawHole(m); drawFlag(m, now); ctx.globalAlpha = 1; }
       else if (tool === 'deco'){ ctx.globalAlpha = .6; drawDeco({ t:curDeco, x:hx, y:hy }, now); ctx.globalAlpha = 1; }
       else if (tool === 'undeco'){ ctx.fillStyle = '#ff5a4a'; ctx.fillRect(hx-3, hy, 7, 1); ctx.fillRect(hx, hy-3, 1, 7); }
+      else if (tool === 'hazard'){
+        ctx.globalAlpha = .6;
+        drawOneHazard({ kind:curHazKind, x:hx, y:hy, len:curHazKind === 'spin' ? 13 : 11, period:HAZ_PERIOD[hazSpeed], phase:0, axis:curHazAxis }, now * 0.001);
+        ctx.globalAlpha = 1;
+      }
+      else if (tool === 'unhazard'){ ctx.fillStyle = '#ff5a4a'; ctx.fillRect(hx-3, hy, 7, 1); ctx.fillRect(hx, hy-3, 1, 7); }
     }
   } else {
     if (hole) drawHole(hole);
@@ -1045,6 +1070,7 @@ function render(now){
     }
     drawGolfer(now);
     for (const d of below) drawDeco(d, now);
+    drawHazards(simTime);
     if (hole) drawFlag(hole, now);
     drawAim();
     drawWindIndicator();
@@ -1055,8 +1081,8 @@ function render(now){
 /* ================================================================== *
  *  EDITING
  * ================================================================== */
-const snapshot = () => ({ t:terrain.slice(), e:elev.slice(), tee:tee && {...tee}, hole:hole && {...hole}, d:decos.map(d => ({...d})) });
-function restoreSnap(s){ terrain = s.t.slice(); elev.set(s.e); tee = s.tee && {...s.tee}; hole = s.hole && {...s.hole}; decos = s.d.map(d => ({...d})); rebuildSolids(); dirty = true; }
+const snapshot = () => ({ t:terrain.slice(), e:elev.slice(), tee:tee && {...tee}, hole:hole && {...hole}, d:decos.map(d => ({...d})), z:hazards.map(z => ({...z})) });
+function restoreSnap(s){ terrain = s.t.slice(); elev.set(s.e); tee = s.tee && {...s.tee}; hole = s.hole && {...s.hole}; decos = s.d.map(d => ({...d})); hazards = s.z.map(z => ({...z})); rebuildSolids(); dirty = true; }
 function pushUndo(){ undoStack.push(snapshot()); if (undoStack.length > 40) undoStack.shift(); redoStack.length = 0; changed = true; syncUI(); }
 function undo(){ if (!undoStack.length) return; redoStack.push(snapshot()); restoreSnap(undoStack.pop()); changed = true; syncUI(); }
 function redo(){ if (!redoStack.length) return; undoStack.push(snapshot()); restoreSnap(redoStack.pop()); changed = true; syncUI(); }
@@ -1124,6 +1150,7 @@ function clearAround(m){
   }
   // solid decorations too close to a marker get removed
   decos = decos.filter(d => !(DECOS[d.t].solid && Math.hypot(d.x - m.x, d.y - m.y) < 8));
+  hazards = hazards.filter(z => Math.hypot(z.x - m.x, z.y - m.y) >= 12);
   rebuildSolids();
   dirty = true;
 }
@@ -1152,6 +1179,24 @@ function removeDecoAt(p){
   });
   if (best < 0){ toast('No decoration there'); return; }
   pushUndo(); decos.splice(best, 1); rebuildSolids();
+}
+function placeHazard(p){
+  const x = Math.floor(p.x), y = Math.floor(p.y);
+  if (hazards.length >= MAX_HAZARDS){ toast('That is plenty of moving hazards!'); return; }
+  const margin = curHazKind === 'spin' ? 16 : 16;
+  if (x < margin || y < margin*0.6 || x >= W - margin || y >= H - margin*0.6){ toast("Can't place it there — too close to the edge"); return; }
+  const t = terrain[y*W + x];
+  if (t === T.VOID || t === T.WATER || t === T.MOUNTAIN){ toast('Place it on open land'); return; }
+  if ([tee, hole].some(m => m && Math.hypot(m.x - x, m.y - y) < 12)){ toast('Too close to the tee or hole'); return; }
+  if (hazards.some(z => Math.hypot(z.x - x, z.y - y) < 10)){ toast('Too close to another hazard'); return; }
+  pushUndo();
+  hazards.push({ kind:curHazKind, x, y, len:curHazKind === 'spin' ? 13 : 11, period:HAZ_PERIOD[hazSpeed], phase:Math.random() * Math.PI * 2, axis:curHazAxis });
+}
+function removeHazardAt(p){
+  let best = -1, bd = 14;
+  hazards.forEach((z, i) => { const d = Math.hypot(z.x - p.x, z.y - p.y); if (d < bd){ bd = d; best = i; } });
+  if (best < 0){ toast('No hazard there'); return; }
+  pushUndo(); hazards.splice(best, 1);
 }
 function newCourse(name, fill){
   holes = [blankHole(fill)]; loadHoleIntoActive(0);
@@ -1246,7 +1291,10 @@ function serialize(){
   commitHole();
   return {
     v:4, name:courseName, w:W, h:H,
-    holes: holes.map(h => ({ tee:h.tee, hole:h.hole, rle:rleEnc(h.terrain), erle:rleEnc(h.elev), decos:h.decos.map(d => [d.t, d.x, d.y]) })),
+    holes: holes.map(h => ({
+      tee:h.tee, hole:h.hole, rle:rleEnc(h.terrain), erle:rleEnc(h.elev), decos:h.decos.map(d => [d.t, d.x, d.y]),
+      hz:(h.hazards || []).map(z => [z.kind === 'spin' ? 1 : 0, z.x, z.y, Math.round(z.len), Math.round(z.period * 10), Math.round(z.phase * 100), z.axis === 'v' ? 1 : 0]),
+    })),
   };
 }
 function parseHoles(o, cap = MAX_HOLES){
@@ -1262,7 +1310,14 @@ function parseHoles(o, cap = MAX_HOLES){
     if (Array.isArray(hd.decos)) for (const a of hd.decos.slice(0, MAX_DECOS)){
       if (Array.isArray(a) && Number.isInteger(a[0]) && a[0] >= 0 && a[0] < DECOS.length && Number.isFinite(a[1]) && Number.isFinite(a[2])) ds.push({ t:a[0], x:clamp(a[1]|0, 0, W-1), y:clamp(a[2]|0, 0, H-1) });
     }
-    return { terrain:t, elev:e, decos:ds, tee:ok(hd.tee), hole:ok(hd.hole), undo:[], redo:[] };
+    const zs = [];
+    if (Array.isArray(hd.hz)) for (const a of hd.hz.slice(0, MAX_HAZARDS)){
+      if (Array.isArray(a) && Number.isFinite(a[1]) && Number.isFinite(a[2])) zs.push({
+        kind:a[0] === 1 ? 'spin' : 'slide', x:clamp(a[1]|0, 0, W-1), y:clamp(a[2]|0, 0, H-1),
+        len:clamp(Number(a[3]) || 12, 4, 30), period:clamp((Number(a[4]) || 22) / 10, 0.6, 8), phase:(Number(a[5]) || 0) / 100, axis:a[6] === 1 ? 'v' : 'h',
+      });
+    }
+    return { terrain:t, elev:e, decos:ds, hazards:zs, tee:ok(hd.tee), hole:ok(hd.hole), undo:[], redo:[] };
   });
 }
 function applyData(o){
@@ -1322,7 +1377,7 @@ const FB_VER = '10.14.1';
 // If the other app signs people in with a username (turned into a fake email), put that email domain here.
 // Leave empty if people sign in with their real email.
 const USERNAME_EMAIL_DOMAIN = '';
-const COL = { courses:'golf_courses', data:'golf_courseData', comments:'golf_comments', profiles:'golf_profiles' };
+const COL = { courses:'golf_courses', data:'golf_courseData', comments:'golf_comments', profiles:'golf_profiles', scores:'golf_scores' };
 let fbPromise = null, fbState = 'connecting', pubBusy = false, user = null, playerName = '';
 const isOwner = () => !!(user && curCourse.source === 'online' && curCourse.ownerId && curCourse.ownerId === user.uid);
 const okName = n => typeof n === 'string' && n.length > 0 && n.length <= 20;
@@ -1514,6 +1569,38 @@ async function addComment(c){
   const all = lsGet(K_COMMENTS, {});
   (all[curCourse.id] = all[curCourse.id] || []).push({ id:'c' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), ...c, ts:Date.now() });
   lsSet(K_COMMENTS, all);
+}
+async function submitScore(strokes, tp){
+  if (!user || curCourse.source !== 'online' || !curCourse.id) return;
+  try {
+    const { fs, db } = await withTimeout(getFB(), 10000);
+    const col = fs.collection(db, COL.courses, curCourse.id, COL.scores);
+    const mine = await withTimeout(fs.getDocs(fs.query(col, fs.where('uid', '==', user.uid), fs.limit(1))), 12000);
+    const nm = playerName || defaultName();
+    if (mine.empty) await fs.addDoc(col, { uid:user.uid, name:nm, strokes, par:tp, createdAt:fs.serverTimestamp() });
+    else { const d = mine.docs[0]; if (strokes < d.data().strokes) await fs.updateDoc(d.ref, { strokes, name:nm, par:tp, createdAt:fs.serverTimestamp() }); }
+  } catch (e) { console.error(e); }
+}
+async function openLeaderboard(){
+  if (curCourse.source === 'chain'){ toast('Leaderboards are not available for multi-course rounds yet'); return; }
+  if (curCourse.source !== 'online' || !curCourse.id){ toast('Leaderboards are only for published courses'); return; }
+  const box = el('div'), list = el('div');
+  box.appendChild(el('p', { className:'muted' }, 'Best score per player, this course only.'));
+  box.appendChild(list);
+  modal('Leaderboard', box, [{ label:'Close' }]);
+  list.appendChild(el('p', { className:'muted' }, 'Loading...'));
+  try {
+    const { fs, db } = await withTimeout(getFB(), 10000);
+    const snap = await withTimeout(fs.getDocs(fs.query(fs.collection(db, COL.courses, curCourse.id, COL.scores), fs.orderBy('strokes', 'asc'), fs.limit(20))), 15000);
+    list.innerHTML = '';
+    if (snap.empty){ list.appendChild(el('p', { className:'muted' }, 'No scores yet. Be the first!')); return; }
+    let i = 0;
+    snap.forEach(d => {
+      i++; const v = d.data(), mine = user && v.uid === user.uid;
+      list.appendChild(el('p', {}, '#' + i + '  ' + (v.name || 'Player') + (mine ? ' (you)' : '') + '  —  ' + v.strokes
+        + (Number.isInteger(v.par) ? '  (' + (v.strokes - v.par >= 0 ? '+' : '') + (v.strokes - v.par) + ')' : '')));
+    });
+  } catch (e) { console.error(e); list.innerHTML = ''; list.appendChild(el('p', {}, fbError(e))); }
 }
 async function deleteComment(id){
   if (curCourse.source === 'online'){
@@ -2083,6 +2170,54 @@ function land(){
   sfx.bounce();
   settle();
 }
+let simTime = 0;
+function hazardCircles(t){
+  const out = [];
+  for (const hz of hazards){
+    if (hz.kind === 'slide'){
+      const off = Math.sin((t / hz.period) * Math.PI * 2 + hz.phase) * hz.len;
+      out.push({ x:hz.x + (hz.axis === 'v' ? 0 : off), y:hz.y + (hz.axis === 'v' ? off : 0), r:2.6, hz, off });
+    } else {
+      const a = (t / hz.period) * Math.PI * 2 + hz.phase;
+      out.push({ x:hz.x + Math.cos(a) * hz.len, y:hz.y + Math.sin(a) * hz.len, r:1.7, hz, a });
+      out.push({ x:hz.x - Math.cos(a) * hz.len, y:hz.y - Math.sin(a) * hz.len, r:1.7, hz, a: a + Math.PI });
+    }
+  }
+  return out;
+}
+function checkHazards(){
+  if (!hazards.length) return;
+  for (const c of hazardCircles(simTime)){
+    const dx = ball.x - c.x, dy = ball.y - c.y, d = Math.hypot(dx, dy), rr = c.r + 1.1;
+    if (d < rr){
+      const nx = d > 0.001 ? dx / d : 1, ny = d > 0.001 ? dy / d : 0;
+      const dot = ball.vx * nx + ball.vy * ny, e = 0.85;
+      if (dot < 0){ ball.vx -= (1 + e) * dot * nx; ball.vy -= (1 + e) * dot * ny; }
+      ball.vx += nx * 0.5; ball.vy += ny * 0.5;
+      ball.x = c.x + nx * rr; ball.y = c.y + ny * rr; ball.air = false; ball.z = 0;
+      sfx.bounce(); spawnBurst(ball.x, ball.y, 5, ['#e0c086', '#a87c4e', '#8a5a34'], .9, .5);
+    }
+  }
+}
+function drawOneHazard(hz, t){
+  if (hz.kind === 'slide'){
+    const off = Math.sin((t / hz.period) * Math.PI * 2 + hz.phase) * hz.len;
+    const cx = hz.x + (hz.axis === 'v' ? 0 : off), cy = hz.y + (hz.axis === 'v' ? off : 0);
+    rect(cx - 3, cy + 2, 7, 1, 'rgba(0,0,0,.28)');
+    rect(cx - 3, cy - 2, 7, 5, '#8a5a34'); rect(cx - 3, cy - 2, 7, 1, '#a8703c'); rect(cx - 3, cy + 2, 7, 1, '#5e3a20');
+    rect(cx - 2, cy - 1, 5, 1, '#c48a4c');
+  } else {
+    const a = (t / hz.period) * Math.PI * 2 + hz.phase;
+    rect(hz.x - 1, hz.y - 1, 3, 3, 'rgba(0,0,0,.22)');
+    for (const sign of [1, -1]){
+      const ex = hz.x + Math.cos(a) * hz.len * sign, ey = hz.y + Math.sin(a) * hz.len * sign;
+      for (let sp = 3; sp <= hz.len; sp += 3) rect(Math.round(hz.x + Math.cos(a) * sp * sign), Math.round(hz.y + Math.sin(a) * sp * sign), 2, 2, sign > 0 ? '#a8703c' : '#8a5a34');
+      rect(Math.round(ex) - 1, Math.round(ey) - 1, 3, 3, '#5e3a20');
+    }
+    rect(hz.x - 1, hz.y - 1, 2, 2, '#3a2a20');
+  }
+}
+function drawHazards(t){ for (const hz of hazards) drawOneHazard(hz, t); }
 function stepBall(){
   if (ball.holed) return;
   if (ball.sink > 0){ ball.sink++; if (ball.sink > 36 && !react) onHoleDone(); return; }
@@ -2093,12 +2228,14 @@ function stepBall(){
     ball.z = 4 * ball.H * u * (1 - u);
     ball.vx += wind.dx * WIND_K * wind.mag; ball.vy += wind.dy * WIND_K * wind.mag;
     if (moveBall(Math.max(1, Math.ceil(Math.hypot(ball.vx, ball.vy))), true)) return;
+    checkHazards();
     if (ball.air && ball.t >= ball.T) land();
     return;
   }
   const si = clamp(Math.floor(ball.y), 0, H-1)*W + clamp(Math.floor(ball.x), 0, W-1);
   ball.vx -= SLOPE_K * gxA[si]; ball.vy -= SLOPE_K * gyA[si];
   if (moveBall(Math.max(1, Math.ceil(Math.hypot(ball.vx, ball.vy))), false)) return;
+  checkHazards();
   if (!ball.moving) return;
   const f = FRIC[clamp(getT(ball.x, ball.y), 0, 8)];
   ball.vx *= f; ball.vy *= f;
@@ -2147,6 +2284,7 @@ function showFinalResults(){
   if (solo){
     const improved = curCourse.id ? setBestIfBetter(curCourse.id, totals[0]) : false;
     const b = curCourse.id ? bestFor(curCourse.id) : null;
+    if (curCourse.source === 'online') submitScore(totals[0], tp);
     card.append(
       el('h3', {}, scoreName(totals[0], tp)),
       el('p', {}, totals[0] + (totals[0] === 1 ? ' stroke' : ' strokes') + ', par ' + tp
@@ -2223,6 +2361,10 @@ cv.addEventListener('pointerdown', e => {
     if (erase) removeDecoAt(p); else placeDeco(p);      // no dragging: one click, one decoration
   } else if (tool === 'undeco'){
     removeDecoAt(p);
+  } else if (tool === 'hazard'){
+    if (erase) removeHazardAt(p); else placeHazard(p);  // no dragging: one click, one hazard
+  } else if (tool === 'unhazard'){
+    removeHazardAt(p);
   } else { pushUndo(); dragging = { marker:tool }; placeMarker(tool, c); }
 });
 cv.addEventListener('pointermove', e => {
@@ -2264,7 +2406,9 @@ DECOS.forEach((d, i) => {
   b.onclick = () => { curDeco = i; tool = 'deco'; syncUI(); };
   $('decos').appendChild(b);
 });
-document.querySelectorAll('[data-tool]').forEach(b => b.onclick = () => { tool = b.dataset.tool; syncUI(); });
+document.querySelectorAll('[data-tool]').forEach(b => b.onclick = () => { tool = b.dataset.tool; if (b.dataset.haz) curHazKind = b.dataset.haz; syncUI(); });
+$('hazSpeed').oninput = e => { hazSpeed = +e.target.value; syncUI(); };
+$('hazAxisBtn').onclick = () => { curHazAxis = curHazAxis === 'h' ? 'v' : 'h'; syncUI(); };
 document.querySelectorAll('#clubs .btn').forEach(b => b.onclick = () => { clubMode = b.dataset.club; syncUI(); });
 document.querySelectorAll('#roleSeg .btn').forEach(b => b.onclick = () => setRole(b.dataset.role));
 $('size').oninput = e => { brushSize = +e.target.value; syncUI(); };
@@ -2294,6 +2438,7 @@ $('tabPlay').onclick = () => { if (mode !== 'play') startPlay(); };
 $('restartBtn').onclick = () => { resetBall(); syncUI(); };
 $('backBtn').onclick = stopPlay;
 $('reviewsBtn').onclick = openReviews;
+$('lbBtn').onclick = openLeaderboard;
 $('menuBtn').onclick = () => {
   if (role === 'editor' && changed) confirmModal('Leave without saving?', 'You have changes that are not saved or published yet.', 'Leave', showMenu);
   else showMenu();
@@ -2329,7 +2474,10 @@ function syncUI(){
   document.querySelectorAll('#roleSeg .btn').forEach(b => b.classList.toggle('on', b.dataset.role === role));
   $('modeTabs').hidden = !editor; $('backBtn').hidden = !editor;
   $('tabEdit').classList.toggle('on', edit); $('tabPlay').classList.toggle('on', !edit);
-  document.querySelectorAll('[data-tool]').forEach(b => b.classList.toggle('on', b.dataset.tool === tool));
+  document.querySelectorAll('[data-tool]').forEach(b => b.classList.toggle('on', b.dataset.tool === tool && (!b.dataset.haz || b.dataset.haz === curHazKind)));
+  $('hazSpeedVal').textContent = hazSpeed; $('hazSpeed').value = hazSpeed;
+  $('hazAxisBtn').textContent = 'Slider: ' + (curHazAxis === 'h' ? 'horizontal' : 'vertical');
+  $('hazAxisBtn').disabled = tool === 'hazard' && curHazKind === 'spin';
   document.querySelectorAll('[data-deco]').forEach(b => b.classList.toggle('on', tool === 'deco' && +b.dataset.deco === curDeco));
   document.querySelectorAll('#terrains .btn').forEach(b => {
     const paints = tool === 'brush' || tool === 'fill';
@@ -2359,7 +2507,9 @@ function syncUI(){
               : 'Viewer mode: drag back from anywhere and let go to swing. Wind pushes shots in the air. Press Reviews to leave a comment.')
     : (tool === 'deco' || tool === 'undeco')
       ? 'Click to place one decoration. Dragging does not place more. Right-click removes the nearest one.'
-      : 'Drag to paint. Right-click erases to void (or reverses raise and lower). Switch holes above, or add up to 18. Keys: B brush, F fill, R raise, L lower, G flatten, T tee, H hole, D decorate, 1-9 terrain, [ ] size, Ctrl+Z undo.';
+      : (tool === 'hazard' || tool === 'unhazard')
+        ? 'Click to place one moving hazard. Right-click removes the nearest one. Balls bounce off them while they move.'
+        : 'Drag to paint. Right-click erases to void (or reverses raise and lower). Switch holes above, or add up to 18. Keys: B brush, F fill, R raise, L lower, G flatten, T tee, H hole, D decorate, Z hazard, 1-9 terrain, [ ] size, Ctrl+Z undo.';
   cv.style.cursor = edit ? 'crosshair' : 'grab';
   const heat = isHeightTool(tool) && edit;
   if (heat !== lastHeat){ lastHeat = heat; dirty = true; }
@@ -2392,6 +2542,7 @@ window.addEventListener('keydown', e => {
     if (e.ctrlKey || e.metaKey || e.altKey) return;
     if (k === 'b') tool = 'brush'; else if (k === 'f') tool = 'fill'; else if (k === 't') tool = 'tee'; else if (k === 'h') tool = 'hole';
     else if (k === 'r') tool = 'raise'; else if (k === 'l') tool = 'lower'; else if (k === 'g') tool = 'flat'; else if (k === 'd') tool = 'deco';
+    else if (k === 'z') tool = 'hazard';
     else if (k >= '1' && k <= '9'){ cur = +k - 1; if (tool !== 'brush' && tool !== 'fill') tool = 'brush'; }
     else if (k === '[') brushSize = Math.max(1, brushSize - 1);
     else if (k === ']') brushSize = Math.min(20, brushSize + 1);
@@ -2420,7 +2571,7 @@ window.addEventListener('resize', fit);
 let last = performance.now(), acc = 0;
 function frame(now){
   acc += Math.min(100, now - last); last = now;
-  while (acc >= 16.667){ acc -= 16.667; if (screen === 'game' && mode === 'play'){ stepReact(); stepSwing(); stepBall(); } stepParticles(); }
+  while (acc >= 16.667){ acc -= 16.667; if (screen === 'game' && mode === 'play'){ simTime += 0.016667; stepReact(); stepSwing(); stepBall(); } stepParticles(); }
   if (screen === 'game'){ updateHUD(); render(now); }
   requestAnimationFrame(frame);
 }

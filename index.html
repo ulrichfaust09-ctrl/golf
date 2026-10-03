@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Pixel Linkz</title>
+<title>Pixel Links – Golf Course Maker</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
@@ -104,7 +104,8 @@ aside .panel,.dialog{background:var(--panel);border:3px solid var(--line);box-sh
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
 .span2{grid-column:span 2}
-.terrain-btn{display:flex;align-items:center;gap:8px;text-align:left;padding:8px 8px}
+.terrain-btn{display:flex;align-items:center;gap:8px;text-align:left;padding:8px 8px;cursor:help}
+.deco-icon{width:18px;height:22px;flex:none;image-rendering:pixelated}
 .chip{width:14px;height:14px;border:2px solid var(--line);flex:none}
 .dim{opacity:.45}
 .status{margin-top:12px;color:var(--muted);line-height:2}
@@ -154,7 +155,7 @@ input[type=range]{width:100%;accent-color:var(--accent);margin:4px 0 0}
   <section id="menu">
     <div class="hero">
       <canvas id="heroCv" width="320" height="80" aria-hidden="true"></canvas>
-      <div class="hero-text"><h1>Pixel Linkz</h1><span>Build a course. Share it. Play it.</span></div>
+      <div class="hero-text"><h1>Pixel Links</h1><span>Build a course. Share it. Play it.</span></div>
     </div>
     <div class="menu-bar">
       <div class="tabs">
@@ -259,14 +260,23 @@ input[type=range]{width:100%;accent-color:var(--accent);margin:4px 0 0}
           <div class="panel">
             <h2>Moving hazards</h2>
             <div class="grid2">
-              <button class="btn" data-tool="hazard" data-haz="spin">Spinner</button>
-              <button class="btn" data-tool="hazard" data-haz="slide">Slider</button>
+              <button class="btn" data-tool="hazard" data-haz="spin" title="Two arms rotate in a full circle">Spinner</button>
+              <button class="btn" data-tool="hazard" data-haz="slide" title="Slides back and forth in a line">Slider</button>
+              <button class="btn" data-tool="hazard" data-haz="pendulum" title="A single arm swings back and forth like a clock pendulum">Pendulum</button>
+              <button class="btn" data-tool="hazard" data-haz="popper" title="Pops up and down — safe when it's flat">Popper</button>
             </div>
             <button class="btn wide" data-tool="unhazard" style="margin-top:10px">Remove</button>
             <h2 style="margin:14px 0 4px">Speed <span id="hazSpeedVal" style="color:var(--ink)"></span></h2>
             <input type="range" id="hazSpeed" min="1" max="5" value="3" aria-label="Hazard speed">
             <button class="btn wide" id="hazAxisBtn" style="margin-top:12px">Slider: horizontal</button>
             <p class="note">Click to place one. A spinner rotates in place; a slider slides back and forth. Right-click removes the nearest one.</p>
+          </div>
+
+          <div class="panel">
+            <h2>Portals</h2>
+            <div class="grid2" id="portalColors"></div>
+            <button class="btn wide" data-tool="unportal" style="margin-top:10px">Remove</button>
+            <p class="note">Place two of the same color to link them — rolling into one sends the ball out the other. A lone portal does nothing until it has a pair. Right-click removes the nearest one.</p>
           </div>
 
           <div class="panel">
@@ -331,15 +341,15 @@ input[type=range]{width:100%;accent-color:var(--accent);margin:4px 0 0}
 const W = 240, H = 150;
 const T = { ROUGH:0, FAIRWAY:1, GREEN:2, SAND:3, WATER:4, TREE:5, VOID:6, MOUNTAIN:7, ICE:8 };
 const TERRAINS = [
-  { id:0, name:'Rough',   color:'#3a7a3c' },
-  { id:1, name:'Fairway', color:'#6eb64f' },
-  { id:2, name:'Green',   color:'#86cc62' },
-  { id:3, name:'Sand',    color:'#e8d08e' },
-  { id:4, name:'Water',   color:'#3a78c8' },
-  { id:5, name:'Trees',   color:'#1e5430' },
-  { id:6, name:'Void (walls)', color:'#1a2622' },
-  { id:7, name:'Mountain', color:'#8c8a84' },
-  { id:8, name:'Ice', color:'#bfe6f5', wide:true },
+  { id:0, name:'Rough',   color:'#3a7a3c', desc:'Slows the ball down a lot. Shots land shorter.' },
+  { id:1, name:'Fairway', color:'#6eb64f', desc:'Normal speed and roll. The default playing surface.' },
+  { id:2, name:'Green',   color:'#86cc62', desc:'Fast and smooth. Auto-switches you to the putter.' },
+  { id:3, name:'Sand',    color:'#e8d08e', desc:'Shots fly shorter and the ball stops almost dead.' },
+  { id:4, name:'Water',   color:'#3a78c8', desc:'A splash costs a stroke and sends the ball back.' },
+  { id:5, name:'Trees',   color:'#1e5430', desc:'Blocks and bounces shots. Can be flown over.' },
+  { id:6, name:'Void (walls)', color:'#1a2622', desc:'Out of bounds. The edge of your land becomes a bouncy wall.' },
+  { id:7, name:'Mountain', color:'#8c8a84', desc:'Automatically the highest ground. Blocks shots like a wall.' },
+  { id:8, name:'Ice', color:'#bfe6f5', wide:true, desc:'Very little friction — the ball slides a long way.' },
 ];
 // solid = footprint [x0,y0,x1,y1] relative to the deco's base point
 const DECOS = [
@@ -358,6 +368,9 @@ const DECOS = [
 ];
 const MAX_DECOS = 150;
 const MAX_HAZARDS = 20;
+const MAX_PORTALS = 8;
+const PORTAL_COLORS = ['#3b8be0', '#a84bd6', '#e0923b', '#3fb06a'];
+const PORTAL_SCALE = 1.75;
 const MAX_HOLES = 18;
 const LIE_NAMES = ['Rough','Fairway','Green','Sand','Water','Trees','Void','Mountain','Ice'];
 const FRIC   = [0.935, 0.972, 0.978, 0.86, 0.9, 0.9, 0.9, 0.9, 0.99];
@@ -384,13 +397,17 @@ let terrain = new Uint8Array(W*H);
 const elev = new Int8Array(W*H);
 let decos = [];
 let hazards = [];
+let portals = [];
 const decoSolid = new Uint8Array(W*H);
 let decoSorted = [];
 let tee = null, hole = null;
 let courseName = 'My course';
 let tool = 'brush', cur = 1, curDeco = 0, brushSize = 6, hstep = 6, hardEdge = false;
 let curHazKind = 'spin', curHazAxis = 'h', hazSpeed = 3;
+let curPortalColor = 0;
+let courseLocked = false, allowedClubs = ['driver', 'putter'];
 const HAZ_PERIOD = { 1:4.4, 2:3.2, 3:2.2, 4:1.5, 5:1.0 };
+const HAZ_KINDS = ['slide', 'spin', 'pendulum', 'popper'];
 let mode = 'edit', role = 'editor', screen = 'menu';
 let curCourse = { id:null, source:'new' };
 let changed = false;
@@ -403,7 +420,7 @@ let holes = [], curHole = 0, editHoleBeforePlay = 0;
 let players = [{ name:'You' }], round = null;
 let chainBounds = null, chainReturnWorld = null;
 
-const ball = { x:0, y:0, vx:0, vy:0, z:0, air:false, t:0, T:1, H:10, sink:0, holed:false, moving:false, lx:0, ly:0 };
+const ball = { x:0, y:0, vx:0, vy:0, z:0, air:false, t:0, T:1, H:10, sink:0, holed:false, moving:false, lx:0, ly:0, portalCd:0 };
 let strokes = 0, clubMode = 'auto', aim = null;
 let swing = null, lastFace = 1;
 const SWING_IMPACT = 7, SWING_END = 24;
@@ -461,13 +478,13 @@ const calcPar = () => parOf(tee, hole);
    above are always the currently checked-out hole; `holes[]` holds the rest. ---- */
 function blankHole(fill){
   const t = new Uint8Array(W*H); if (fill !== undefined) t.fill(fill);
-  return { terrain:t, elev:new Int8Array(W*H), decos:[], hazards:[], tee:null, hole:null, undo:[], redo:[] };
+  return { terrain:t, elev:new Int8Array(W*H), decos:[], hazards:[], portals:[], tee:null, hole:null, undo:[], redo:[] };
 }
-function commitHole(){ holes[curHole] = { terrain, elev:elev.slice(), decos, hazards, tee, hole, undo:undoStack, redo:redoStack }; }
+function commitHole(){ holes[curHole] = { terrain, elev:elev.slice(), decos, hazards, portals, tee, hole, undo:undoStack, redo:redoStack }; }
 function loadHoleIntoActive(i){
   curHole = i;
   const h = holes[i];
-  terrain = h.terrain; elev.set(h.elev); decos = h.decos.map(d => ({...d})); hazards = (h.hazards || []).map(z => ({...z})); tee = h.tee; hole = h.hole;
+  terrain = h.terrain; elev.set(h.elev); decos = h.decos.map(d => ({...d})); hazards = (h.hazards || []).map(z => ({...z})); portals = (h.portals || []).map(p => ({...p})); tee = h.tee; hole = h.hole;
   undoStack = h.undo || []; redoStack = h.redo || [];
   rebuildSolids(); dirty = true;
 }
@@ -538,6 +555,7 @@ const sfx = {
   oob:    () => { beep(220, .3, 'sawtooth', .03, -150); },
   cup:    () => { beep(523, .12, 'square', .04); beep(659, .12, 'square', .04, 0, .1); beep(784, .22, 'square', .04, 0, .2); },
   bounce: () => { const n = performance.now(); if (n - lastBounce < 70) return; lastBounce = n; beep(170, .05, 'square', .03, -70); },
+  portal: () => { beep(240, .18, 'sine', .04, 420); beep(480, .14, 'sine', .035, 260, .05); },
 };
 
 /* ================================================================== *
@@ -912,8 +930,10 @@ function drawBrushPreview(p){
 
 function maxDrag(){ const sf = cv.clientWidth / W || 1; return clamp(150 / sf, 28, 60); }
 function currentClub(){
-  if (clubMode !== 'auto') return clubMode;
-  return getT(ball.x, ball.y) === T.GREEN ? 'putter' : 'driver';
+  let c = clubMode;
+  if (c === 'auto' || !allowedClubs.includes(c)) c = getT(ball.x, ball.y) === T.GREEN ? 'putter' : 'driver';
+  if (!allowedClubs.includes(c)) c = allowedClubs[0];
+  return c;
 }
 const carryOf = p => 14 + 110*p;
 
@@ -1021,7 +1041,7 @@ function drawStaticSprites(now){
   if (hole) drawHole(hole);
   if (tee) drawTee(tee, true);
   for (const d of decoSorted) drawDeco(d, now);
-  drawHazards(now * 0.001);
+  drawHazards(now * 0.001); drawPortals(now * 0.001);
   if (hole) drawFlag(hole, now);
 }
 function render(now){
@@ -1053,6 +1073,8 @@ function render(now){
         ctx.globalAlpha = 1;
       }
       else if (tool === 'unhazard'){ ctx.fillStyle = '#ff5a4a'; ctx.fillRect(hx-3, hy, 7, 1); ctx.fillRect(hx, hy-3, 1, 7); }
+      else if (tool === 'portal'){ ctx.globalAlpha = .7; drawOnePortal({ color:curPortalColor, x:hx, y:hy }, now * 0.001, true); ctx.globalAlpha = 1; }
+      else if (tool === 'unportal'){ ctx.fillStyle = '#ff5a4a'; ctx.fillRect(hx-3, hy, 7, 1); ctx.fillRect(hx, hy-3, 1, 7); }
     }
   } else {
     if (hole) drawHole(hole);
@@ -1070,7 +1092,7 @@ function render(now){
     }
     drawGolfer(now);
     for (const d of below) drawDeco(d, now);
-    drawHazards(simTime);
+    drawHazards(simTime); drawPortals(simTime);
     if (hole) drawFlag(hole, now);
     drawAim();
     drawWindIndicator();
@@ -1081,8 +1103,8 @@ function render(now){
 /* ================================================================== *
  *  EDITING
  * ================================================================== */
-const snapshot = () => ({ t:terrain.slice(), e:elev.slice(), tee:tee && {...tee}, hole:hole && {...hole}, d:decos.map(d => ({...d})), z:hazards.map(z => ({...z})) });
-function restoreSnap(s){ terrain = s.t.slice(); elev.set(s.e); tee = s.tee && {...s.tee}; hole = s.hole && {...s.hole}; decos = s.d.map(d => ({...d})); hazards = s.z.map(z => ({...z})); rebuildSolids(); dirty = true; }
+const snapshot = () => ({ t:terrain.slice(), e:elev.slice(), tee:tee && {...tee}, hole:hole && {...hole}, d:decos.map(d => ({...d})), z:hazards.map(z => ({...z})), p:portals.map(p => ({...p})) });
+function restoreSnap(s){ terrain = s.t.slice(); elev.set(s.e); tee = s.tee && {...s.tee}; hole = s.hole && {...s.hole}; decos = s.d.map(d => ({...d})); hazards = s.z.map(z => ({...z})); portals = s.p.map(p => ({...p})); rebuildSolids(); dirty = true; }
 function pushUndo(){ undoStack.push(snapshot()); if (undoStack.length > 40) undoStack.shift(); redoStack.length = 0; changed = true; syncUI(); }
 function undo(){ if (!undoStack.length) return; redoStack.push(snapshot()); restoreSnap(undoStack.pop()); changed = true; syncUI(); }
 function redo(){ if (!redoStack.length) return; undoStack.push(snapshot()); restoreSnap(redoStack.pop()); changed = true; syncUI(); }
@@ -1151,6 +1173,7 @@ function clearAround(m){
   // solid decorations too close to a marker get removed
   decos = decos.filter(d => !(DECOS[d.t].solid && Math.hypot(d.x - m.x, d.y - m.y) < 8));
   hazards = hazards.filter(z => Math.hypot(z.x - m.x, z.y - m.y) >= 12);
+  portals = portals.filter(p => Math.hypot(p.x - m.x, p.y - m.y) >= 10);
   rebuildSolids();
   dirty = true;
 }
@@ -1183,7 +1206,7 @@ function removeDecoAt(p){
 function placeHazard(p){
   const x = Math.floor(p.x), y = Math.floor(p.y);
   if (hazards.length >= MAX_HAZARDS){ toast('That is plenty of moving hazards!'); return; }
-  const margin = curHazKind === 'spin' ? 16 : 16;
+  const margin = 16;
   if (x < margin || y < margin*0.6 || x >= W - margin || y >= H - margin*0.6){ toast("Can't place it there — too close to the edge"); return; }
   const t = terrain[y*W + x];
   if (t === T.VOID || t === T.WATER || t === T.MOUNTAIN){ toast('Place it on open land'); return; }
@@ -1198,9 +1221,29 @@ function removeHazardAt(p){
   if (best < 0){ toast('No hazard there'); return; }
   pushUndo(); hazards.splice(best, 1);
 }
+function placePortal(p){
+  const x = Math.floor(p.x), y = Math.floor(p.y);
+  if (x < 11 || y < 14 || x >= W - 11 || y >= H - 11){ toast("Can't place it there — too close to the edge"); return; }
+  const t = terrain[y*W + x];
+  if (t === T.VOID || t === T.WATER || t === T.MOUNTAIN || t === T.TREE){ toast('Place it on open land'); return; }
+  if ([tee, hole].some(m => m && Math.hypot(m.x - x, m.y - y) < 10 * PORTAL_SCALE)){ toast('Too close to the tee or hole'); return; }
+  if (portals.some(z => Math.hypot(z.x - x, z.y - y) < 8 * PORTAL_SCALE)){ toast('Too close to another portal'); return; }
+  const sameColor = portals.filter(z => z.color === curPortalColor);
+  if (sameColor.length >= 2){ toast('That color already has a pair. Remove one first.'); return; }
+  if (portals.length >= MAX_PORTALS){ toast('That is plenty of portals!'); return; }
+  pushUndo();
+  portals.push({ color:curPortalColor, x, y });
+}
+function removePortalAt(p){
+  let best = -1, bd = 10 * PORTAL_SCALE;
+  portals.forEach((z, i) => { const d = Math.hypot(z.x - p.x, z.y - p.y); if (d < bd){ bd = d; best = i; } });
+  if (best < 0){ toast('No portal there'); return; }
+  pushUndo(); portals.splice(best, 1);
+}
 function newCourse(name, fill){
   holes = [blankHole(fill)]; loadHoleIntoActive(0);
   courseName = name || 'My course'; changed = false; round = null; chainBounds = null;
+  courseLocked = false; allowedClubs = ['driver', 'putter'];
 }
 
 /* ---- demo course (two holes, to show off multi-hole play) ---- */
@@ -1268,6 +1311,7 @@ function buildDemo(){
   holes = [hole1(), hole2()];
   loadHoleIntoActive(0);
   courseName = 'Riverside Links'; changed = false; round = null; chainBounds = null;
+  courseLocked = false; allowedClubs = ['driver', 'putter'];
 }
 
 /* ================================================================== *
@@ -1290,10 +1334,11 @@ function rleDec(r, Ty, lo, hi){
 function serialize(){
   commitHole();
   return {
-    v:4, name:courseName, w:W, h:H,
+    v:4, name:courseName, w:W, h:H, locked:courseLocked, clubs:allowedClubs,
     holes: holes.map(h => ({
       tee:h.tee, hole:h.hole, rle:rleEnc(h.terrain), erle:rleEnc(h.elev), decos:h.decos.map(d => [d.t, d.x, d.y]),
-      hz:(h.hazards || []).map(z => [z.kind === 'spin' ? 1 : 0, z.x, z.y, Math.round(z.len), Math.round(z.period * 10), Math.round(z.phase * 100), z.axis === 'v' ? 1 : 0]),
+      hz:(h.hazards || []).map(z => [HAZ_KINDS.indexOf(z.kind), z.x, z.y, Math.round(z.len), Math.round(z.period * 10), Math.round(z.phase * 100), z.axis === 'v' ? 1 : 0]),
+      pt:(h.portals || []).map(p => [p.color, p.x, p.y]),
     })),
   };
 }
@@ -1313,16 +1358,23 @@ function parseHoles(o, cap = MAX_HOLES){
     const zs = [];
     if (Array.isArray(hd.hz)) for (const a of hd.hz.slice(0, MAX_HAZARDS)){
       if (Array.isArray(a) && Number.isFinite(a[1]) && Number.isFinite(a[2])) zs.push({
-        kind:a[0] === 1 ? 'spin' : 'slide', x:clamp(a[1]|0, 0, W-1), y:clamp(a[2]|0, 0, H-1),
+        kind:HAZ_KINDS[a[0]] || 'slide', x:clamp(a[1]|0, 0, W-1), y:clamp(a[2]|0, 0, H-1),
         len:clamp(Number(a[3]) || 12, 4, 30), period:clamp((Number(a[4]) || 22) / 10, 0.6, 8), phase:(Number(a[5]) || 0) / 100, axis:a[6] === 1 ? 'v' : 'h',
       });
     }
-    return { terrain:t, elev:e, decos:ds, hazards:zs, tee:ok(hd.tee), hole:ok(hd.hole), undo:[], redo:[] };
+    const ps = [];
+    if (Array.isArray(hd.pt)) for (const a of hd.pt.slice(0, MAX_PORTALS)){
+      if (Array.isArray(a) && Number.isInteger(a[0]) && a[0] >= 0 && a[0] < PORTAL_COLORS.length && Number.isFinite(a[1]) && Number.isFinite(a[2])) ps.push({ color:a[0], x:clamp(a[1]|0, 0, W-1), y:clamp(a[2]|0, 0, H-1) });
+    }
+    return { terrain:t, elev:e, decos:ds, hazards:zs, portals:ps, tee:ok(hd.tee), hole:ok(hd.hole), undo:[], redo:[] };
   });
 }
 function applyData(o){
   holes = parseHoles(o);
   courseName = String(o.name || 'My course').slice(0, 20);
+  courseLocked = !!o.locked;
+  allowedClubs = Array.isArray(o.clubs) ? o.clubs.filter(c => c === 'driver' || c === 'putter') : ['driver', 'putter'];
+  if (!allowedClubs.length) allowedClubs = ['driver', 'putter'];
   loadHoleIntoActive(0); dirty = true;
 }
 function loadData(o){ applyData(o); changed = false; round = null; chainBounds = null; syncUI(); }
@@ -1496,20 +1548,32 @@ async function loadCommunity(){
   commState = { status:'loading' }; renderMenu();
   try {
     const { fs, db } = await withTimeout(getFB(), 10000);
-    const snap = await withTimeout(fs.getDocs(fs.query(fs.collection(db, COL.courses), fs.orderBy('updatedAt', 'desc'), fs.limit(40))), 15000);
+    const snap = await withTimeout(fs.getDocs(fs.query(fs.collection(db, COL.courses), fs.orderBy('updatedAt', 'desc'), fs.limit(60))), 15000);
     communityList = [];
     snap.forEach(d => {
       const v = d.data();
       if (typeof v.name !== 'string') return;
+      const reviewCount = Number.isInteger(v.reviewCount) && v.reviewCount > 0 ? v.reviewCount : 0;
+      const ratingCount = Number.isInteger(v.ratingCount) && v.ratingCount > 0 ? v.ratingCount : 0;
+      const ratingSum = Number.isFinite(v.ratingSum) ? v.ratingSum : 0;
       communityList.push({
         id:d.id, source:'online', name:v.name.slice(0, 20), par:(Number.isInteger(v.par) && v.par > 0 && v.par <= 90) ? v.par : null,
         ownerId:typeof v.ownerId === 'string' ? v.ownerId : null, ownerName:typeof v.ownerName === 'string' ? v.ownerName.slice(0, 20) : '',
         thumb:(typeof v.thumb === 'string' && v.thumb.startsWith('data:image/jpeg;base64,')) ? v.thumb : '',
+        locked:!!v.locked, reviewCount, rating:ratingCount > 0 ? ratingSum / ratingCount : 0,
+        updatedMs:(v.updatedAt && v.updatedAt.toMillis) ? v.updatedAt.toMillis() : 0,
       });
     });
+    sortCommunity();
     commState = { status:'ok' };
   } catch (e) { console.error(e); commState = { status:'error', msg:fbError(e) }; }
   renderMenu();
+}
+let commSort = 'new';
+function sortCommunity(){
+  if (!communityList) return;
+  const by = { new:(a, b) => b.updatedMs - a.updatedMs, rating:(a, b) => b.rating - a.rating || b.reviewCount - a.reviewCount, reviews:(a, b) => b.reviewCount - a.reviewCount };
+  communityList.sort(by[commSort] || by.new);
 }
 async function fetchOnlineData(id){
   const { fs, db } = await withTimeout(getFB(), 10000);
@@ -1534,8 +1598,8 @@ async function publishOnline(asNew){
     const update = curCourse.source === 'online' && isOwner() && !asNew;
     const cref = update ? fs.doc(db, COL.courses, curCourse.id) : fs.doc(fs.collection(db, COL.courses));
     const batch = fs.writeBatch(db);
-    if (update) batch.update(cref, { name:courseName, par, thumb, ownerName:owner, updatedAt:fs.serverTimestamp() });
-    else batch.set(cref, { name:courseName, par, thumb, ownerId:user.uid, ownerName:owner, createdAt:fs.serverTimestamp(), updatedAt:fs.serverTimestamp() });
+    if (update) batch.update(cref, { name:courseName, par, thumb, ownerName:owner, locked:courseLocked, updatedAt:fs.serverTimestamp() });
+    else batch.set(cref, { name:courseName, par, thumb, ownerId:user.uid, ownerName:owner, locked:courseLocked, reviewCount:0, ratingSum:0, ratingCount:0, createdAt:fs.serverTimestamp(), updatedAt:fs.serverTimestamp() });
     batch.set(fs.doc(db, COL.data, cref.id), { data:JSON.stringify(data) });
     await withTimeout(batch.commit(), 20000);
     curCourse = { id:cref.id, source:'online', ownerId:user.uid }; changed = false; communityList = null;
@@ -1564,6 +1628,10 @@ async function addComment(c){
     const { fs, db } = await withTimeout(getFB(), 10000);
     await withTimeout(fs.addDoc(fs.collection(db, COL.courses, curCourse.id, COL.comments),
       { name:c.name, text:c.text, rating:c.rating, uid:user.uid, createdAt:fs.serverTimestamp() }), 15000);
+    fs.updateDoc(fs.doc(db, COL.courses, curCourse.id), {
+      reviewCount:fs.increment(1), ratingSum:fs.increment(c.rating || 0), ratingCount:fs.increment(c.rating ? 1 : 0),
+    }).catch(() => {});
+    communityList = null;
     return;
   }
   const all = lsGet(K_COMMENTS, {});
@@ -1602,10 +1670,14 @@ async function openLeaderboard(){
     });
   } catch (e) { console.error(e); list.innerHTML = ''; list.appendChild(el('p', {}, fbError(e))); }
 }
-async function deleteComment(id){
+async function deleteComment(id, rating){
   if (curCourse.source === 'online'){
     const { fs, db } = await withTimeout(getFB(), 10000);
     await withTimeout(fs.deleteDoc(fs.doc(db, COL.courses, curCourse.id, COL.comments, id)), 15000);
+    fs.updateDoc(fs.doc(db, COL.courses, curCourse.id), {
+      reviewCount:fs.increment(-1), ratingSum:fs.increment(-(rating || 0)), ratingCount:fs.increment(rating ? -1 : 0),
+    }).catch(() => {});
+    communityList = null;
     return;
   }
   const all = lsGet(K_COMMENTS, {});
@@ -1758,7 +1830,7 @@ function openReviews(){
         r.append(el('div', { className:'rd' }, new Date(c.ts).toLocaleDateString()));
         if (canDelete(c)){
           const del = el('button', { className:'btn sm', style:'margin-top:8px' }, 'Delete');
-          del.onclick = async () => { del.disabled = true; try { await deleteComment(c.id); refresh(); } catch (e) { msg.textContent = fbError(e); del.disabled = false; } };
+          del.onclick = async () => { del.disabled = true; try { await deleteComment(c.id, c.rating); refresh(); } catch (e) { msg.textContent = fbError(e); del.disabled = false; } };
           r.append(del);
         }
         list.appendChild(r);
@@ -2046,7 +2118,7 @@ function canAim(){ return mode === 'play' && !swing && !react && !ball.moving &&
 function resetBall(){
   ball.x = tee.x + .5; ball.y = tee.y + .5; ball.vx = ball.vy = 0; ball.z = 0;
   ball.air = false; ball.sink = 0; ball.holed = false; ball.moving = false;
-  ball.lx = ball.x; ball.ly = ball.y; strokes = 0; aim = null; swing = null; react = null; parts.length = 0;
+  ball.lx = ball.x; ball.ly = ball.y; ball.portalCd = 0; strokes = 0; aim = null; swing = null; react = null; parts.length = 0;
   $('result').classList.remove('show');
 }
 function startPlay(){
@@ -2054,6 +2126,7 @@ function startPlay(){
   const badIdx = holes.findIndex(h => !h.tee || !h.hole);
   if (badIdx !== -1){ toast(holes.length > 1 ? 'Hole ' + (badIdx + 1) + ' needs a tee spot and a hole' : 'Place a tee spot and a hole first'); return; }
   editHoleBeforePlay = curHole;
+  if (!chainBounds && clubMode !== 'auto' && !allowedClubs.includes(clubMode)) clubMode = 'auto';
   mode = 'play'; ensureBuilt();
   round = { scores: players.map(() => holes.map(() => null)), playerIdx:0, holeIdx:0 };
   loadHoleIntoActive(0); rollWind(); resetBall(); syncUI();
@@ -2177,10 +2250,16 @@ function hazardCircles(t){
     if (hz.kind === 'slide'){
       const off = Math.sin((t / hz.period) * Math.PI * 2 + hz.phase) * hz.len;
       out.push({ x:hz.x + (hz.axis === 'v' ? 0 : off), y:hz.y + (hz.axis === 'v' ? off : 0), r:2.6, hz, off });
-    } else {
+    } else if (hz.kind === 'spin'){
       const a = (t / hz.period) * Math.PI * 2 + hz.phase;
       out.push({ x:hz.x + Math.cos(a) * hz.len, y:hz.y + Math.sin(a) * hz.len, r:1.7, hz, a });
       out.push({ x:hz.x - Math.cos(a) * hz.len, y:hz.y - Math.sin(a) * hz.len, r:1.7, hz, a: a + Math.PI });
+    } else if (hz.kind === 'pendulum'){
+      const a = Math.PI / 2 + Math.sin((t / hz.period) * Math.PI * 2 + hz.phase) * 1.05;
+      out.push({ x:hz.x + Math.cos(a) * hz.len, y:hz.y + Math.sin(a) * hz.len, r:1.9, hz, a });
+    } else if (hz.kind === 'popper'){
+      const u = (Math.sin((t / hz.period) * Math.PI * 2 + hz.phase) + 1) / 2;
+      if (u > 0.6) out.push({ x:hz.x, y:hz.y, r:2.2, hz, u });
     }
   }
   return out;
@@ -2206,7 +2285,7 @@ function drawOneHazard(hz, t){
     rect(cx - 3, cy + 2, 7, 1, 'rgba(0,0,0,.28)');
     rect(cx - 3, cy - 2, 7, 5, '#8a5a34'); rect(cx - 3, cy - 2, 7, 1, '#a8703c'); rect(cx - 3, cy + 2, 7, 1, '#5e3a20');
     rect(cx - 2, cy - 1, 5, 1, '#c48a4c');
-  } else {
+  } else if (hz.kind === 'spin'){
     const a = (t / hz.period) * Math.PI * 2 + hz.phase;
     rect(hz.x - 1, hz.y - 1, 3, 3, 'rgba(0,0,0,.22)');
     for (const sign of [1, -1]){
@@ -2215,9 +2294,55 @@ function drawOneHazard(hz, t){
       rect(Math.round(ex) - 1, Math.round(ey) - 1, 3, 3, '#5e3a20');
     }
     rect(hz.x - 1, hz.y - 1, 2, 2, '#3a2a20');
+  } else if (hz.kind === 'pendulum'){
+    const a = Math.PI / 2 + Math.sin((t / hz.period) * Math.PI * 2 + hz.phase) * 1.05;
+    const ex = hz.x + Math.cos(a) * hz.len, ey = hz.y + Math.sin(a) * hz.len;
+    rect(Math.round(ex) - 1, hz.y + hz.len + 1, 3, 1, 'rgba(0,0,0,.2)');
+    rect(hz.x - 2, hz.y - 2, 5, 2, '#5e3a20'); rect(hz.x - 1, hz.y - 1, 3, 1, '#3a2a20');
+    for (let sp = 2; sp <= hz.len; sp += 3) rect(Math.round(hz.x + Math.cos(a) * sp), Math.round(hz.y + Math.sin(a) * sp), 1, 1, '#c8c8ce');
+    rect(Math.round(ex) - 2, Math.round(ey) - 2, 4, 4, '#8a3b2a'); rect(Math.round(ex) - 1, Math.round(ey) - 2, 2, 1, '#c85a3f');
+  } else if (hz.kind === 'popper'){
+    const u = (Math.sin((t / hz.period) * Math.PI * 2 + hz.phase) + 1) / 2, up = u > 0.6;
+    rect(hz.x - 3, hz.y, 7, 2, 'rgba(0,0,0,.25)');
+    rect(hz.x - 3, hz.y - 1, 7, 2, '#7a5a3a'); rect(hz.x - 3, hz.y - 1, 7, 1, '#9a7850');
+    const h = Math.round(2 + u * 7);
+    rect(hz.x - 1, hz.y - h, 3, h, up ? '#d8443a' : '#a85c54');
+    rect(hz.x - 1, hz.y - h, 3, 1, up ? '#f08070' : '#c08078');
+    if (up){ rect(hz.x - 2, hz.y - h - 1, 5, 1, '#f0a090'); }
   }
 }
 function drawHazards(t){ for (const hz of hazards) drawOneHazard(hz, t); }
+function checkPortals(){
+  if (!portals.length) return;
+  if (ball.portalCd > 0){ ball.portalCd--; return; }
+  for (const p of portals){
+    if (Math.hypot(ball.x - p.x - .5, ball.y - p.y - .5) > 2.1 * PORTAL_SCALE) continue;
+    const partner = portals.find(q => q !== p && q.color === p.color);
+    if (!partner) continue;
+    spawnBurst(ball.x, ball.y, 14, [PORTAL_COLORS[p.color], '#fff'], 1.3, 1, Math.round(2 * PORTAL_SCALE));
+    ball.x = partner.x + .5; ball.y = partner.y + .5; ball.portalCd = 24;
+    sfx.portal();
+    spawnBurst(ball.x, ball.y, 14, [PORTAL_COLORS[partner.color], '#fff'], 1.3, 1, Math.round(2 * PORTAL_SCALE));
+    return;
+  }
+}
+function drawOnePortal(p, t, paired){
+  const cx = p.x + .5, cy = p.y + .5, col = PORTAL_COLORS[p.color], s = PORTAL_SCALE;
+  rect(cx - 2 * s, cy + 2 * s, Math.round(5 * s), Math.max(1, Math.round(1 * s)), 'rgba(0,0,0,.25)');
+  ctx.globalAlpha = paired ? 1 : 0.4;
+  for (let ring = 3; ring >= 1; ring--){
+    const a = t * 2.6 * (ring % 2 === 0 ? 1 : -1) + ring;
+    const sz = ring === 1 ? Math.max(1, Math.round(s)) : Math.max(1, Math.round(s));
+    for (let k = 0; k < 6; k++){
+      const ang = a + k * Math.PI / 3, rx = ring * 1.4 * s, ry = ring * 0.8 * s;
+      rect(Math.round(cx + Math.cos(ang) * rx), Math.round(cy + Math.sin(ang) * ry - ring * 0.3 * s), sz, sz, ring === 1 ? '#fff' : col);
+    }
+  }
+  ctx.globalAlpha = 1;
+}
+function drawPortals(t){
+  for (const p of portals) drawOnePortal(p, t, portals.some(q => q !== p && q.color === p.color));
+}
 function stepBall(){
   if (ball.holed) return;
   if (ball.sink > 0){ ball.sink++; if (ball.sink > 36 && !react) onHoleDone(); return; }
@@ -2235,7 +2360,7 @@ function stepBall(){
   const si = clamp(Math.floor(ball.y), 0, H-1)*W + clamp(Math.floor(ball.x), 0, W-1);
   ball.vx -= SLOPE_K * gxA[si]; ball.vy -= SLOPE_K * gyA[si];
   if (moveBall(Math.max(1, Math.ceil(Math.hypot(ball.vx, ball.vy))), false)) return;
-  checkHazards();
+  checkHazards(); checkPortals();
   if (!ball.moving) return;
   const f = FRIC[clamp(getT(ball.x, ball.y), 0, 8)];
   ball.vx *= f; ball.vy *= f;
@@ -2365,6 +2490,10 @@ cv.addEventListener('pointerdown', e => {
     if (erase) removeHazardAt(p); else placeHazard(p);  // no dragging: one click, one hazard
   } else if (tool === 'unhazard'){
     removeHazardAt(p);
+  } else if (tool === 'portal'){
+    if (erase) removePortalAt(p); else placePortal(p);  // no dragging: one click, one portal
+  } else if (tool === 'unportal'){
+    removePortalAt(p);
   } else { pushUndo(); dragging = { marker:tool }; placeMarker(tool, c); }
 });
 cv.addEventListener('pointermove', e => {
@@ -2394,17 +2523,33 @@ cv.addEventListener('pointerleave', () => { if (!dragging) hover = null; });
  *  UI WIRING
  * ================================================================== */
 TERRAINS.forEach(t => {
-  const b = el('button', { className:'btn terrain-btn' + (t.wide ? ' span2' : '') });
+  const b = el('button', { className:'btn terrain-btn' + (t.wide ? ' span2' : ''), title:t.desc });
   b.dataset.terrain = t.id;
   const chip = el('span', { className:'chip' }); chip.style.background = t.color;
   b.append(chip, document.createTextNode(t.name));
   b.onclick = () => { cur = t.id; if (tool !== 'brush' && tool !== 'fill') tool = 'brush'; syncUI(); };
   $('terrains').appendChild(b);
 });
+const icv = document.createElement('canvas'); icv.width = 20; icv.height = 24;
+const ictx = icv.getContext('2d');
+function decoIconURL(i){
+  const prev = ctx; ctx = ictx;
+  try { ictx.clearRect(0, 0, 20, 24); drawDeco({ t:i, x:10, y:20 }, 0); } finally { ctx = prev; }
+  return icv.toDataURL('image/png');
+}
 DECOS.forEach((d, i) => {
-  const b = el('button', { className:'btn' }, d.name); b.dataset.deco = i;
+  const b = el('button', { className:'btn terrain-btn' }); b.dataset.deco = i;
+  b.append(el('img', { className:'deco-icon', src:decoIconURL(i), alt:'' }), document.createTextNode(d.name));
   b.onclick = () => { curDeco = i; tool = 'deco'; syncUI(); };
   $('decos').appendChild(b);
+});
+const PORTAL_NAMES = ['Blue', 'Purple', 'Orange', 'Green'];
+PORTAL_COLORS.forEach((c, i) => {
+  const b = el('button', { className:'btn terrain-btn' }); b.dataset.portal = i;
+  const chip = el('span', { className:'chip' }); chip.style.background = c; chip.style.borderRadius = '50%';
+  b.append(chip, document.createTextNode(PORTAL_NAMES[i] + ' portal'));
+  b.onclick = () => { curPortalColor = i; tool = 'portal'; syncUI(); };
+  $('portalColors').appendChild(b);
 });
 document.querySelectorAll('[data-tool]').forEach(b => b.onclick = () => { tool = b.dataset.tool; if (b.dataset.haz) curHazKind = b.dataset.haz; syncUI(); });
 $('hazSpeed').oninput = e => { hazSpeed = +e.target.value; syncUI(); };
@@ -2477,14 +2622,18 @@ function syncUI(){
   document.querySelectorAll('[data-tool]').forEach(b => b.classList.toggle('on', b.dataset.tool === tool && (!b.dataset.haz || b.dataset.haz === curHazKind)));
   $('hazSpeedVal').textContent = hazSpeed; $('hazSpeed').value = hazSpeed;
   $('hazAxisBtn').textContent = 'Slider: ' + (curHazAxis === 'h' ? 'horizontal' : 'vertical');
-  $('hazAxisBtn').disabled = tool === 'hazard' && curHazKind === 'spin';
+  $('hazAxisBtn').disabled = tool === 'hazard' && curHazKind !== 'slide';
   document.querySelectorAll('[data-deco]').forEach(b => b.classList.toggle('on', tool === 'deco' && +b.dataset.deco === curDeco));
+  document.querySelectorAll('[data-portal]').forEach(b => b.classList.toggle('on', tool === 'portal' && +b.dataset.portal === curPortalColor));
   document.querySelectorAll('#terrains .btn').forEach(b => {
     const paints = tool === 'brush' || tool === 'fill';
     b.classList.toggle('on', +b.dataset.terrain === cur && paints);
     b.classList.toggle('dim', !paints);
   });
-  document.querySelectorAll('#clubs .btn').forEach(b => b.classList.toggle('on', b.dataset.club === clubMode));
+  document.querySelectorAll('#clubs .btn').forEach(b => {
+    b.classList.toggle('on', b.dataset.club === clubMode);
+    b.hidden = b.dataset.club !== 'auto' && !allowedClubs.includes(b.dataset.club);
+  });
   $('sizeVal').textContent = brushSize + 'px'; $('size').value = brushSize;
   $('hstepVal').textContent = hstep; $('hstep').value = hstep;
   $('edgeBtn').textContent = 'Edge: ' + (hardEdge ? 'hard' : 'soft');
@@ -2509,7 +2658,9 @@ function syncUI(){
       ? 'Click to place one decoration. Dragging does not place more. Right-click removes the nearest one.'
       : (tool === 'hazard' || tool === 'unhazard')
         ? 'Click to place one moving hazard. Right-click removes the nearest one. Balls bounce off them while they move.'
-        : 'Drag to paint. Right-click erases to void (or reverses raise and lower). Switch holes above, or add up to 18. Keys: B brush, F fill, R raise, L lower, G flatten, T tee, H hole, D decorate, Z hazard, 1-9 terrain, [ ] size, Ctrl+Z undo.';
+        : (tool === 'portal' || tool === 'unportal')
+          ? 'Click to place one portal. Two of the same color teleport the ball between them. Right-click removes the nearest one.'
+          : 'Drag to paint. Right-click erases to void (or reverses raise and lower). Switch holes above, or add up to 18. Keys: B brush, F fill, R raise, L lower, G flatten, T tee, H hole, D decorate, Z hazard, P portal, 1-9 terrain, [ ] size, Ctrl+Z undo.';
   cv.style.cursor = edit ? 'crosshair' : 'grab';
   const heat = isHeightTool(tool) && edit;
   if (heat !== lastHeat){ lastHeat = heat; dirty = true; }
@@ -2542,7 +2693,7 @@ window.addEventListener('keydown', e => {
     if (e.ctrlKey || e.metaKey || e.altKey) return;
     if (k === 'b') tool = 'brush'; else if (k === 'f') tool = 'fill'; else if (k === 't') tool = 'tee'; else if (k === 'h') tool = 'hole';
     else if (k === 'r') tool = 'raise'; else if (k === 'l') tool = 'lower'; else if (k === 'g') tool = 'flat'; else if (k === 'd') tool = 'deco';
-    else if (k === 'z') tool = 'hazard';
+    else if (k === 'z') tool = 'hazard'; else if (k === 'p') tool = 'portal';
     else if (k >= '1' && k <= '9'){ cur = +k - 1; if (tool !== 'brush' && tool !== 'fill') tool = 'brush'; }
     else if (k === '[') brushSize = Math.max(1, brushSize - 1);
     else if (k === ']') brushSize = Math.min(20, brushSize + 1);

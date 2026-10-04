@@ -162,6 +162,11 @@ input[type=range]{width:100%;accent-color:var(--accent);margin:4px 0 0}
         <button class="btn" id="tabCommunity">Community</button>
         <button class="btn" id="tabDevice">On this device</button>
         <button class="btn" id="tabChains">Multi course</button>
+        <select class="text" id="commSort" style="margin-bottom:0;width:auto">
+          <option value="new">Sort: Newest</option>
+          <option value="rating">Sort: Highest rated</option>
+          <option value="reviews">Sort: Most reviews</option>
+        </select>
       </div>
       <div class="tabs">
         <button class="btn primary" id="mNew">New course</button>
@@ -291,6 +296,18 @@ input[type=range]{width:100%;accent-color:var(--accent);margin:4px 0 0}
               <button class="btn span2" id="shareBtn">Share code</button>
               <button class="btn span2" id="linkBtn">Course Link</button>
             </div>
+          </div>
+
+          <div class="panel">
+            <h2>Clubs allowed</h2>
+            <div class="grid2">
+              <button class="btn" id="clubWoodBtn">Wood: on</button>
+              <button class="btn" id="clubPutterBtn">Putter: on</button>
+            </div>
+            <p class="note">Turn a club off to force players to use the other one on this course. At least one has to stay on.</p>
+            <h2 style="margin:14px 0 4px">Access</h2>
+            <button class="btn wide" id="lockBtn">Unlocked — anyone can copy this</button>
+            <p class="note">Locking an online course lets people play it but not open it in the editor, so they can't copy your layout. Only matters once it's published.</p>
           </div>
         </div>
 
@@ -1892,11 +1909,16 @@ function cardEl(it, label, canDelete){
   tb.onclick = () => openCourse(it, it.par ? 'viewer' : 'editor');
   const body = el('div', { className:'cc-body' });
   const b = bestFor(it.id);
-  body.append(el('div', { className:'cc-title' }, it.name), el('div', { className:'cc-meta' }, (it.par ? 'Par ' + it.par : 'Unfinished') + '  |  ' + label + (b !== null ? '  |  Best ' + b : '')));
+  const bits = [it.par ? 'Par ' + it.par : 'Unfinished', label];
+  if (it.reviewCount) bits.push((it.rating ? '★' + it.rating.toFixed(1) + ' ' : '') + it.reviewCount + (it.reviewCount === 1 ? ' review' : ' reviews'));
+  if (b !== null) bits.push('Best ' + b);
+  if (it.locked) bits.push('🔒');
+  body.append(el('div', { className:'cc-title' }, it.name), el('div', { className:'cc-meta' }, bits.join('  |  ')));
   const acts = el('div', { className:'cc-actions' });
   const play = el('button', { className:'btn sm primary' }, 'Play'); play.disabled = !it.par; play.onclick = () => openCourse(it, 'viewer');
-  const edit = el('button', { className:'btn sm' }, 'Edit'); edit.onclick = () => openCourse(it, 'editor');
-  acts.append(play, edit);
+  const lockedOut = it.source === 'online' && it.locked && !(user && it.ownerId === user.uid);
+  if (!lockedOut){ const edit = el('button', { className:'btn sm' }, 'Edit'); edit.onclick = () => openCourse(it, 'editor'); acts.append(edit); }
+  acts.prepend(play);
   if (canDelete){
     const del = el('button', { className:'btn sm' }, 'Delete');
     del.onclick = () => confirmModal('Delete course?', 'Delete "' + it.name + '" from this device?', 'Delete', () => {
@@ -1912,6 +1934,8 @@ function renderMenu(){
   $('tabCommunity').classList.toggle('on', menuTab === 'community');
   $('tabDevice').classList.toggle('on', menuTab === 'device');
   $('tabChains').classList.toggle('on', menuTab === 'chains');
+  $('commSort').hidden = menuTab !== 'community';
+  $('commSort').value = commSort;
   renderConn();
   const grid = $('cards'); grid.innerHTML = '';
   const empty = msg => grid.appendChild(el('div', { className:'empty' }, msg));
@@ -1946,11 +1970,16 @@ async function openCourse(rec, wantRole){
     else { notify('Loading ' + rec.name + '...'); obj = await fetchOnlineData(rec.id); }
     loadData(obj);
     courseName = rec.name; curCourse = { id:rec.id, source:rec.source, ownerId:rec.ownerId || null };
-    const ready = allHolesReady();
+    const ready = allHolesReady(), lockedOut = rec.source === 'online' && rec.locked && !isOwner();
+    let forcedViewer = false;
+    if (wantRole === 'editor' && lockedOut){
+      if (!ready){ toast('This course is locked and unfinished, so it cannot be opened'); showMenu(); return; }
+      wantRole = 'viewer'; forcedViewer = true;
+    }
     role = (wantRole === 'viewer' && ready) ? 'viewer' : 'editor';
     mode = role === 'viewer' ? 'play' : 'edit';
     showGame(); chainBounds = null;
-    if (role === 'viewer') startPlay();
+    if (role === 'viewer'){ startPlay(); if (forcedViewer) toast('This course is locked: you can play it, but not edit it'); }
     else if (wantRole === 'viewer') toast('This course is not finished yet, so you are editing');
     else if (rec.source === 'online' && !isOwner()) toast('Not your course: Publish saves your own copy');
   } catch (e) { console.error(e); notify('Could not open that course. ' + fbError(e)); }
@@ -2066,7 +2095,7 @@ async function playChain(chain){
     chainReturnWorld = saveWorld();
     holes = allHoles; loadHoleIntoActive(0); chainBounds = bounds;
     curCourse = { id:null, source:'chain', chainId:chain.id };
-    courseName = chain.name; role = 'viewer';
+    courseName = chain.name; role = 'viewer'; allowedClubs = ['driver', 'putter'];
     showGame(); startPlay();
   } catch (e) { console.error(e); notify('Could not start that chain. ' + (e && e.message ? e.message : fbError(e))); }
 }
@@ -2577,6 +2606,17 @@ $('pubBtn').onclick = () => publishOnline(false);
 $('pubNewBtn').onclick = () => publishOnline(true);
 $('shareBtn').onclick = openShare;
 $('linkBtn').onclick = openCourseLink;
+$('clubWoodBtn').onclick = () => {
+  if (allowedClubs.includes('driver')){ if (allowedClubs.length < 2){ toast('At least one club has to stay on'); return; } allowedClubs = allowedClubs.filter(c => c !== 'driver'); }
+  else allowedClubs = allowedClubs.concat('driver');
+  changed = true; syncUI();
+};
+$('clubPutterBtn').onclick = () => {
+  if (allowedClubs.includes('putter')){ if (allowedClubs.length < 2){ toast('At least one club has to stay on'); return; } allowedClubs = allowedClubs.filter(c => c !== 'putter'); }
+  else allowedClubs = allowedClubs.concat('putter');
+  changed = true; syncUI();
+};
+$('lockBtn').onclick = () => { courseLocked = !courseLocked; changed = true; syncUI(); };
 $('playBtn').onclick = () => { chainBounds = null; startPlay(); };
 $('tabEdit').onclick = () => { if (mode !== 'edit') stopPlay(); };
 $('tabPlay').onclick = () => { if (mode !== 'play') startPlay(); };
@@ -2592,6 +2632,7 @@ document.querySelectorAll('.sfx').forEach(b => b.onclick = () => { sfxOn = !sfxO
 $('tabCommunity').onclick = () => { menuTab = 'community'; renderMenu(); };
 $('tabDevice').onclick = () => { menuTab = 'device'; renderMenu(); };
 $('tabChains').onclick = () => { menuTab = 'chains'; renderMenu(); };
+$('commSort').onchange = e => { commSort = e.target.value; sortCommunity(); renderMenu(); };
 $('achBtn').onclick = openAchievements;
 $('mNew').onclick = openNew; $('mImport').onclick = openImport;
 $('authBtn').onclick = () => user ? openAccount() : openSignIn();
@@ -2625,6 +2666,12 @@ function syncUI(){
   $('hazAxisBtn').disabled = tool === 'hazard' && curHazKind !== 'slide';
   document.querySelectorAll('[data-deco]').forEach(b => b.classList.toggle('on', tool === 'deco' && +b.dataset.deco === curDeco));
   document.querySelectorAll('[data-portal]').forEach(b => b.classList.toggle('on', tool === 'portal' && +b.dataset.portal === curPortalColor));
+  $('clubWoodBtn').textContent = 'Wood: ' + (allowedClubs.includes('driver') ? 'on' : 'off');
+  $('clubWoodBtn').classList.toggle('on', allowedClubs.includes('driver'));
+  $('clubPutterBtn').textContent = 'Putter: ' + (allowedClubs.includes('putter') ? 'on' : 'off');
+  $('clubPutterBtn').classList.toggle('on', allowedClubs.includes('putter'));
+  $('lockBtn').textContent = courseLocked ? 'Locked — only you can edit it' : 'Unlocked — anyone can copy this';
+  $('lockBtn').classList.toggle('on', courseLocked);
   document.querySelectorAll('#terrains .btn').forEach(b => {
     const paints = tool === 'brush' || tool === 'fill';
     b.classList.toggle('on', +b.dataset.terrain === cur && paints);

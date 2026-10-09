@@ -171,6 +171,7 @@ input[type=range]{width:100%;accent-color:var(--accent);margin:4px 0 0}
       <div class="tabs">
         <button class="btn primary" id="mNew">New course</button>
         <button class="btn" id="mImport">Import code</button>
+        <button class="btn" id="mRedeem">Redeem invite</button>
         <button class="btn" id="mRefresh">Refresh</button>
         <button class="btn" id="achBtn">Trophies</button>
         <button class="btn" id="authBtn">Sign in</button>
@@ -224,10 +225,8 @@ input[type=range]{width:100%;accent-color:var(--accent);margin:4px 0 0}
           </div>
 
           <div class="panel">
-            <h2>Tool</h2>
+            <h2>Markers</h2>
             <div class="grid2">
-              <button class="btn" data-tool="brush">Brush</button>
-              <button class="btn" data-tool="fill">Fill</button>
               <button class="btn" data-tool="tee">Tee spot</button>
               <button class="btn" data-tool="hole">Hole</button>
             </div>
@@ -235,53 +234,77 @@ input[type=range]{width:100%;accent-color:var(--accent);margin:4px 0 0}
           </div>
 
           <div class="panel">
+            <h2>Mode</h2>
+            <div class="grid3">
+              <button class="btn sm" data-mode="select">1 Select</button>
+              <button class="btn sm" data-mode="move">2 Move</button>
+              <button class="btn sm" data-mode="shape">3 Shape</button>
+              <button class="btn sm" data-mode="build">4 Build</button>
+              <button class="btn sm" data-mode="remove">5 Remove</button>
+            </div>
+            <p class="note" id="modeNote"></p>
+          </div>
+
+          <div class="panel">
+            <div class="tabs" id="catTabs" style="flex-wrap:wrap">
+              <button class="btn" data-cat="terrain">Terrain</button>
+              <button class="btn" data-cat="decor">Decor</button>
+              <button class="btn" data-cat="hazards">Hazards</button>
+              <button class="btn" data-cat="special">Special</button>
+            </div>
+          </div>
+
+          <div class="panel" id="catPanel-terrain">
             <h2>Terrain</h2>
             <div class="grid2" id="terrains"></div>
-            <p class="note">Void is out of bounds. The edge of your painted land becomes a bouncy wall. Mountain automatically sets its own height to the highest peak and blocks shots.</p>
+            <div class="grid3" id="terrainStyle" style="margin-top:10px">
+              <button class="btn sm" data-tstyle="paint">Paint</button>
+              <button class="btn sm" data-tstyle="fill">Fill</button>
+              <button class="btn sm" data-tstyle="raise">Raise</button>
+              <button class="btn sm" data-tstyle="lower">Lower</button>
+              <button class="btn sm span2" data-tstyle="flatten">Flatten</button>
+            </div>
             <h2 style="margin:14px 0 4px">Brush size <span id="sizeVal" style="color:var(--ink)"></span></h2>
             <input type="range" id="size" min="1" max="20" value="6" aria-label="Brush size">
-          </div>
-
-          <div class="panel">
-            <h2>Height (changes speed)</h2>
-            <div class="grid2">
-              <button class="btn" data-tool="raise">Raise</button>
-              <button class="btn" data-tool="lower">Lower</button>
-              <button class="btn span2" data-tool="flat">Flatten</button>
+            <div id="heightExtra">
+              <h2 style="margin:14px 0 4px">Step <span id="hstepVal" style="color:var(--ink)"></span></h2>
+              <input type="range" id="hstep" min="1" max="20" value="6" aria-label="Height step">
+              <button class="btn wide" id="edgeBtn" style="margin-top:12px">Edge: soft</button>
             </div>
-            <h2 style="margin:14px 0 4px">Step <span id="hstepVal" style="color:var(--ink)"></span></h2>
-            <input type="range" id="hstep" min="1" max="20" value="6" aria-label="Height step">
-            <button class="btn wide" id="edgeBtn" style="margin-top:12px">Edge: soft</button>
-            <p class="note">Balls roll faster downhill and slow down uphill. Right-click reverses raise and lower.</p>
+            <p class="note">Void is out of bounds — its edge becomes a bouncy wall. Mountain is automatically the highest ground and blocks shots.</p>
           </div>
 
-          <div class="panel">
+          <div class="panel" id="catPanel-decor">
             <h2>Decorations</h2>
             <div class="grid2" id="decos"></div>
-            <button class="btn wide" data-tool="undeco" style="margin-top:10px">Remove</button>
-            <p class="note">Click to place one. Dragging does not place more. Right-click also removes.</p>
+            <p class="note" id="decorNote"></p>
           </div>
 
-          <div class="panel">
+          <div class="panel" id="catPanel-hazards">
             <h2>Moving hazards</h2>
             <div class="grid2">
-              <button class="btn" data-tool="hazard" data-haz="spin" title="Two arms rotate in a full circle">Spinner</button>
-              <button class="btn" data-tool="hazard" data-haz="slide" title="Slides back and forth in a line">Slider</button>
-              <button class="btn" data-tool="hazard" data-haz="pendulum" title="A single arm swings back and forth like a clock pendulum">Pendulum</button>
-              <button class="btn" data-tool="hazard" data-haz="popper" title="Pops up and down — safe when it's flat">Popper</button>
+              <button class="btn" data-haz="spin" title="Two arms rotate in a full circle">Spinner</button>
+              <button class="btn" data-haz="slide" title="Slides back and forth in a line">Slider</button>
+              <button class="btn" data-haz="pendulum" title="A single arm swings back and forth like a clock pendulum">Pendulum</button>
+              <button class="btn" data-haz="popper" title="Pops up and down — safe when it's flat">Popper</button>
             </div>
-            <button class="btn wide" data-tool="unhazard" style="margin-top:10px">Remove</button>
             <h2 style="margin:14px 0 4px">Speed <span id="hazSpeedVal" style="color:var(--ink)"></span></h2>
             <input type="range" id="hazSpeed" min="1" max="5" value="3" aria-label="Hazard speed">
             <button class="btn wide" id="hazAxisBtn" style="margin-top:12px">Slider: horizontal</button>
-            <p class="note">Click to place one. A spinner rotates in place; a slider slides back and forth. Right-click removes the nearest one.</p>
+            <p class="note" id="hazNote"></p>
           </div>
 
-          <div class="panel">
+          <div class="panel" id="catPanel-special">
             <h2>Portals</h2>
             <div class="grid2" id="portalColors"></div>
-            <button class="btn wide" data-tool="unportal" style="margin-top:10px">Remove</button>
-            <p class="note">Place two of the same color to link them — rolling into one sends the ball out the other. A lone portal does nothing until it has a pair. Right-click removes the nearest one.</p>
+            <p class="note" id="specialNote"></p>
+          </div>
+
+          <div class="panel" id="shapePanel" hidden>
+            <h2>Shape</h2>
+            <div class="note" id="shapeInfo"></div>
+            <input type="range" id="shapeSlider" min="40" max="400" value="100" aria-label="Size">
+            <p class="note">Size: <span id="shapeVal">100%</span></p>
           </div>
 
           <div class="panel">
@@ -295,6 +318,7 @@ input[type=range]{width:100%;accent-color:var(--accent);margin:4px 0 0}
               <button class="btn span2" id="pubNewBtn" hidden>Publish as new</button>
               <button class="btn span2" id="shareBtn">Share code</button>
               <button class="btn span2" id="linkBtn">Course Link</button>
+              <button class="btn span2" id="inviteBtn">Invite co-owner</button>
             </div>
           </div>
 
@@ -400,7 +424,7 @@ const HMAX = 60;
 const SINK_MAX_SPEED = 2.2;
 const K_COURSES = 'pixellinks:courses2', K_LEGACY = 'pixellinks:courses', K_COMMENTS = 'pixellinks:comments', K_NAME = 'pixellinks:player', K_BEST = 'pixellinks:best', K_CHAINS = 'pixellinks:chains', K_ACH = 'pixellinks:ach';
 const WIND_K = 0.0065, WIND_NAMES = ['Calm', 'Light air', 'Breezy', 'Windy'];
-const isHeightTool = t => t === 'raise' || t === 'lower' || t === 'flat';
+const isHeightTool = t => t === 'raise' || t === 'lower' || t === 'flatten';
 
 /* ================================================================== *
  *  DOM + STATE
@@ -419,9 +443,11 @@ const decoSolid = new Uint8Array(W*H);
 let decoSorted = [];
 let tee = null, hole = null;
 let courseName = 'My course';
-let tool = 'brush', cur = 1, curDeco = 0, brushSize = 6, hstep = 6, hardEdge = false;
+let tool = null, cur = 1, curDeco = 0, brushSize = 6, hstep = 6, hardEdge = false;
 let curHazKind = 'spin', curHazAxis = 'h', hazSpeed = 3;
 let curPortalColor = 0;
+let editCat = 'terrain', editMode = 'build', terrainStyle = 'paint';
+let selectedObj = null; // { cat:'deco'|'hazard'|'portal', idx }
 let courseLocked = false, allowedClubs = ['driver', 'putter'];
 const HAZ_PERIOD = { 1:4.4, 2:3.2, 3:2.2, 4:1.5, 5:1.0 };
 const HAZ_KINDS = ['slide', 'spin', 'pendulum', 'popper'];
@@ -648,7 +674,9 @@ function rebuildSolids(){
   for (const d of decos){
     const s = DECOS[d.t].solid;
     if (!s) continue;
-    for (let y = d.y + s[1]; y <= d.y + s[3]; y++) for (let x = d.x + s[0]; x <= d.x + s[2]; x++) if (inb(x, y)) decoSolid[y*W+x] = 1;
+    const sc = d.scale || 1;
+    const x0 = d.x + Math.round(s[0]*sc), y0 = d.y + Math.round(s[1]*sc), x1 = d.x + Math.round(s[2]*sc), y1 = d.y + Math.round(s[3]*sc);
+    for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) if (inb(x, y)) decoSolid[y*W+x] = 1;
   }
   decoSorted = decos.slice().sort((a, b) => a.y - b.y);
 }
@@ -696,7 +724,7 @@ const frameBuf = imgData.data;
 function buildBase(){
   computeSlopes(); computeWalls();
   waterIdx.length = 0;
-  const heat = isHeightTool(tool) && mode === 'edit' && role === 'editor' && screen === 'game' && !noHeat;
+  const heat = editCat === 'terrain' && editMode === 'build' && isHeightTool(terrainStyle) && mode === 'edit' && role === 'editor' && screen === 'game' && !noHeat;
   const trAt = (xx, yy) => xx >= 0 && yy >= 0 && xx < W && yy < H && wm[yy*W+xx] === 0 && terrain[yy*W+xx] === T.TREE;
   const mtAt = (xx, yy) => xx >= 0 && yy >= 0 && xx < W && yy < H && wm[yy*W+xx] === 0 && terrain[yy*W+xx] === T.MOUNTAIN;
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++){
@@ -813,6 +841,13 @@ function drawBallAt(bx, by, z, s){
 
 /* ---- decorations (each anchored at its base point x,y) ---- */
 function drawDeco(d, now){
+  const s = d.scale || 1;
+  if (s === 1){ drawDecoRaw(d, now); return; }
+  ctx.save(); ctx.translate(d.x, d.y); ctx.scale(s, s); ctx.translate(-d.x, -d.y);
+  drawDecoRaw(d, now);
+  ctx.restore();
+}
+function drawDecoRaw(d, now){
   const x = d.x, y = d.y;
   switch (d.t){
     case 0: { // windmill
@@ -1076,22 +1111,32 @@ function render(now){
 
   if (mode === 'edit' && role === 'editor'){
     drawStaticSprites(now);
+    if (selectedObj){
+      const arr = catArr(selectedObj.cat), o = arr && arr[selectedObj.idx];
+      if (o){
+        const r = selectedObj.cat === 'deco' ? 6 : selectedObj.cat === 'hazard' ? 15 : 10 * PORTAL_SCALE;
+        ctx.strokeStyle = '#fff'; ctx.setLineDash([2, 2]);
+        ctx.strokeRect(o.x - r, o.y - r - 6, r * 2, r * 2 + 8); ctx.setLineDash([]);
+      } else selectedObj = null;
+    }
     if (hover){
       const hx = Math.floor(hover.x), hy = Math.floor(hover.y);
-      if (tool === 'brush' || isHeightTool(tool)) drawBrushPreview(hover);
-      else if (tool === 'fill'){ ctx.fillStyle = '#fff'; ctx.fillRect(hx-3, hy, 7, 1); ctx.fillRect(hx, hy-3, 1, 7); }
-      else if (tool === 'tee'){ ctx.globalAlpha = .6; drawTee({ x:hx, y:hy }, true); ctx.globalAlpha = 1; }
+      const xRemove = (x, y) => { ctx.fillStyle = '#ff5a4a'; ctx.fillRect(x-3, y, 7, 1); ctx.fillRect(x, y-3, 1, 7); };
+      if (tool === 'tee'){ ctx.globalAlpha = .6; drawTee({ x:hx, y:hy }, true); ctx.globalAlpha = 1; }
       else if (tool === 'hole'){ ctx.globalAlpha = .6; const m = { x:hx, y:hy }; drawHole(m); drawFlag(m, now); ctx.globalAlpha = 1; }
-      else if (tool === 'deco'){ ctx.globalAlpha = .6; drawDeco({ t:curDeco, x:hx, y:hy }, now); ctx.globalAlpha = 1; }
-      else if (tool === 'undeco'){ ctx.fillStyle = '#ff5a4a'; ctx.fillRect(hx-3, hy, 7, 1); ctx.fillRect(hx, hy-3, 1, 7); }
-      else if (tool === 'hazard'){
+      else if (editCat === 'terrain' && editMode === 'build' && (terrainStyle === 'paint' || isHeightTool(terrainStyle))) drawBrushPreview(hover);
+      else if (editCat === 'terrain' && editMode === 'build' && terrainStyle === 'fill'){ ctx.fillStyle = '#fff'; ctx.fillRect(hx-3, hy, 7, 1); ctx.fillRect(hx, hy-3, 1, 7); }
+      else if (editCat === 'terrain' && editMode === 'remove') drawBrushPreview(hover);
+      else if (editCat === 'decor' && editMode === 'build'){ ctx.globalAlpha = .6; drawDeco({ t:curDeco, x:hx, y:hy, scale:1 }, now); ctx.globalAlpha = 1; }
+      else if (editCat === 'decor' && editMode === 'remove') xRemove(hx, hy);
+      else if (editCat === 'hazards' && editMode === 'build'){
         ctx.globalAlpha = .6;
         drawOneHazard({ kind:curHazKind, x:hx, y:hy, len:curHazKind === 'spin' ? 13 : 11, period:HAZ_PERIOD[hazSpeed], phase:0, axis:curHazAxis }, now * 0.001);
         ctx.globalAlpha = 1;
       }
-      else if (tool === 'unhazard'){ ctx.fillStyle = '#ff5a4a'; ctx.fillRect(hx-3, hy, 7, 1); ctx.fillRect(hx, hy-3, 1, 7); }
-      else if (tool === 'portal'){ ctx.globalAlpha = .7; drawOnePortal({ color:curPortalColor, x:hx, y:hy }, now * 0.001, true); ctx.globalAlpha = 1; }
-      else if (tool === 'unportal'){ ctx.fillStyle = '#ff5a4a'; ctx.fillRect(hx-3, hy, 7, 1); ctx.fillRect(hx, hy-3, 1, 7); }
+      else if (editCat === 'hazards' && editMode === 'remove') xRemove(hx, hy);
+      else if (editCat === 'special' && editMode === 'build'){ ctx.globalAlpha = .7; drawOnePortal({ color:curPortalColor, x:hx, y:hy, scale:1 }, now * 0.001, true); ctx.globalAlpha = 1; }
+      else if (editCat === 'special' && editMode === 'remove') xRemove(hx, hy);
     }
   } else {
     if (hole) drawHole(hole);
@@ -1156,8 +1201,8 @@ function heightStamp(cx, cy, sign){
     const w = hardEdge ? 1 : 0.5 * (1 + Math.cos(Math.PI * d / r)), i = y*W + x;
     if (w <= hW[i]) continue;
     hW[i] = w;
-    if (tool === 'flat') elev[i] = Math.round(hBase[i] * (1 - w));
-    else elev[i] = clamp(Math.round(hBase[i] + (tool === 'raise' ? 1 : -1) * sign * hstep * w), -HMAX, HMAX);
+    if (terrainStyle === 'flatten') elev[i] = Math.round(hBase[i] * (1 - w));
+    else elev[i] = clamp(Math.round(hBase[i] + (terrainStyle === 'raise' ? 1 : -1) * sign * hstep * w), -HMAX, HMAX);
   }
   dirty = true;
 }
@@ -1209,7 +1254,7 @@ function placeDeco(p){
   if (t === T.VOID || t === T.WATER){ toast('Place it on land'); return; }
   if (def.solid && [tee, hole].some(m => m && Math.hypot(m.x - x, m.y - y) < 8)){ toast('Too close to the tee or hole'); return; }
   if (decos.some(d => Math.hypot(d.x - x, d.y - y) < 5)){ toast('Something is already there'); return; }
-  pushUndo(); decos.push({ t:curDeco, x, y }); rebuildSolids();
+  pushUndo(); decos.push({ t:curDeco, x, y, scale:1 }); rebuildSolids();
 }
 function removeDecoAt(p){
   let best = -1, bd = 7;
@@ -1249,7 +1294,7 @@ function placePortal(p){
   if (sameColor.length >= 2){ toast('That color already has a pair. Remove one first.'); return; }
   if (portals.length >= MAX_PORTALS){ toast('That is plenty of portals!'); return; }
   pushUndo();
-  portals.push({ color:curPortalColor, x, y });
+  portals.push({ color:curPortalColor, x, y, scale:1 });
 }
 function removePortalAt(p){
   let best = -1, bd = 10 * PORTAL_SCALE;
@@ -1257,10 +1302,63 @@ function removePortalAt(p){
   if (best < 0){ toast('No portal there'); return; }
   pushUndo(); portals.splice(best, 1);
 }
+/* ---- Select / Move / Shape: shared across decor, hazards, special ---- */
+const catArr = cat => cat === 'deco' ? decos : cat === 'hazard' ? hazards : cat === 'portal' ? portals : null;
+const catLabel = cat => cat === 'deco' ? 'decoration' : cat === 'hazard' ? 'hazard' : 'portal';
+function findNearest(cat, p, maxDist){
+  const arr = catArr(cat); if (!arr) return -1;
+  let best = -1, bd = maxDist;
+  arr.forEach((o, i) => { const d = Math.hypot(o.x - p.x, o.y - p.y); if (d < bd){ bd = d; best = i; } });
+  return best;
+}
+const activeCat = () => editCat === 'decor' ? 'deco' : editCat === 'hazards' ? 'hazard' : editCat === 'special' ? 'portal' : null;
+function hitRadius(cat, o){
+  if (cat === 'deco') return 6 * (o.scale || 1) + 4;
+  if (cat === 'hazard') return o.len + 6;
+  return 10 * PORTAL_SCALE * (o.scale || 1) + 4;
+}
+function findNearestGenerous(cat, p){
+  const arr = catArr(cat); if (!arr) return -1;
+  let best = -1, bd = Infinity;
+  arr.forEach((o, i) => { const d = Math.hypot(o.x - p.x, o.y - p.y) - hitRadius(cat, o); if (d < bd){ bd = d; best = i; } });
+  return bd < 10 ? best : -1;
+}
+function trySelect(p){
+  const cat = activeCat(); if (!cat) return;
+  const idx = findNearestGenerous(cat, p);
+  if (idx < 0){ selectedObj = null; toast('Nothing there to select'); syncUI(); return; }
+  selectedObj = { cat, idx }; syncUI();
+  return true;
+}
+function tryStartMove(p){
+  const cat = activeCat(); if (!cat) return;
+  const idx = findNearestGenerous(cat, p);
+  if (idx < 0) return;
+  pushUndo();
+  dragging = { moveCat:cat, moveIdx:idx };
+}
+function applyMove(cat, idx, p){
+  const arr = catArr(cat), o = arr && arr[idx]; if (!o) return;
+  o.x = clamp(Math.round(p.x), 2, W - 2); o.y = clamp(Math.round(p.y), 2, H - 2);
+  dirty = true;
+}
+function shapeValueOf(sel){
+  const arr = catArr(sel.cat), o = arr && arr[sel.idx]; if (!o) return 1;
+  if (sel.cat === 'hazard') return o.len / 12;
+  return o.scale || 1;
+}
+function applyShape(sel, v){
+  const arr = catArr(sel.cat), o = arr && arr[sel.idx]; if (!o) return;
+  v = clamp(v, 0.4, 4);
+  if (sel.cat === 'deco'){ o.scale = v; rebuildSolids(); }
+  else if (sel.cat === 'hazard'){ o.len = clamp(Math.round(12 * v), 4, 48); }
+  else if (sel.cat === 'portal'){ o.scale = v; }
+  dirty = true;
+}
 function newCourse(name, fill){
   holes = [blankHole(fill)]; loadHoleIntoActive(0);
   courseName = name || 'My course'; changed = false; round = null; chainBounds = null;
-  courseLocked = false; allowedClubs = ['driver', 'putter'];
+  courseLocked = false; allowedClubs = ['driver', 'putter']; selectedObj = null; editMode = 'build'; editCat = 'terrain'; tool = null;
 }
 
 /* ---- demo course (two holes, to show off multi-hole play) ---- */
@@ -1328,7 +1426,7 @@ function buildDemo(){
   holes = [hole1(), hole2()];
   loadHoleIntoActive(0);
   courseName = 'Riverside Links'; changed = false; round = null; chainBounds = null;
-  courseLocked = false; allowedClubs = ['driver', 'putter'];
+  courseLocked = false; allowedClubs = ['driver', 'putter']; selectedObj = null; editMode = 'build'; editCat = 'terrain'; tool = null;
 }
 
 /* ================================================================== *
@@ -1353,9 +1451,9 @@ function serialize(){
   return {
     v:4, name:courseName, w:W, h:H, locked:courseLocked, clubs:allowedClubs,
     holes: holes.map(h => ({
-      tee:h.tee, hole:h.hole, rle:rleEnc(h.terrain), erle:rleEnc(h.elev), decos:h.decos.map(d => [d.t, d.x, d.y]),
+      tee:h.tee, hole:h.hole, rle:rleEnc(h.terrain), erle:rleEnc(h.elev), decos:h.decos.map(d => [d.t, d.x, d.y, Math.round((d.scale || 1) * 20)]),
       hz:(h.hazards || []).map(z => [HAZ_KINDS.indexOf(z.kind), z.x, z.y, Math.round(z.len), Math.round(z.period * 10), Math.round(z.phase * 100), z.axis === 'v' ? 1 : 0]),
-      pt:(h.portals || []).map(p => [p.color, p.x, p.y]),
+      pt:(h.portals || []).map(p => [p.color, p.x, p.y, Math.round((p.scale || 1) * 20)]),
     })),
   };
 }
@@ -1370,7 +1468,7 @@ function parseHoles(o, cap = MAX_HOLES){
     const e = Array.isArray(hd.erle) ? rleDec(hd.erle, Int8Array, -HMAX, HMAX) : new Int8Array(W*H);
     const ds = [];
     if (Array.isArray(hd.decos)) for (const a of hd.decos.slice(0, MAX_DECOS)){
-      if (Array.isArray(a) && Number.isInteger(a[0]) && a[0] >= 0 && a[0] < DECOS.length && Number.isFinite(a[1]) && Number.isFinite(a[2])) ds.push({ t:a[0], x:clamp(a[1]|0, 0, W-1), y:clamp(a[2]|0, 0, H-1) });
+      if (Array.isArray(a) && Number.isInteger(a[0]) && a[0] >= 0 && a[0] < DECOS.length && Number.isFinite(a[1]) && Number.isFinite(a[2])) ds.push({ t:a[0], x:clamp(a[1]|0, 0, W-1), y:clamp(a[2]|0, 0, H-1), scale:clamp((Number(a[3]) || 20) / 20, 0.4, 4) });
     }
     const zs = [];
     if (Array.isArray(hd.hz)) for (const a of hd.hz.slice(0, MAX_HAZARDS)){
@@ -1381,7 +1479,7 @@ function parseHoles(o, cap = MAX_HOLES){
     }
     const ps = [];
     if (Array.isArray(hd.pt)) for (const a of hd.pt.slice(0, MAX_PORTALS)){
-      if (Array.isArray(a) && Number.isInteger(a[0]) && a[0] >= 0 && a[0] < PORTAL_COLORS.length && Number.isFinite(a[1]) && Number.isFinite(a[2])) ps.push({ color:a[0], x:clamp(a[1]|0, 0, W-1), y:clamp(a[2]|0, 0, H-1) });
+      if (Array.isArray(a) && Number.isInteger(a[0]) && a[0] >= 0 && a[0] < PORTAL_COLORS.length && Number.isFinite(a[1]) && Number.isFinite(a[2])) ps.push({ color:a[0], x:clamp(a[1]|0, 0, W-1), y:clamp(a[2]|0, 0, H-1), scale:clamp((Number(a[3]) || 20) / 20, 0.4, 4) });
     }
     return { terrain:t, elev:e, decos:ds, hazards:zs, portals:ps, tee:ok(hd.tee), hole:ok(hd.hole), undo:[], redo:[] };
   });
@@ -1392,7 +1490,7 @@ function applyData(o){
   courseLocked = !!o.locked;
   allowedClubs = Array.isArray(o.clubs) ? o.clubs.filter(c => c === 'driver' || c === 'putter') : ['driver', 'putter'];
   if (!allowedClubs.length) allowedClubs = ['driver', 'putter'];
-  loadHoleIntoActive(0); dirty = true;
+  loadHoleIntoActive(0); dirty = true; selectedObj = null; tool = null;
 }
 function loadData(o){ applyData(o); changed = false; round = null; chainBounds = null; syncUI(); }
 function parOfData(o){
@@ -1446,9 +1544,10 @@ const FB_VER = '10.14.1';
 // If the other app signs people in with a username (turned into a fake email), put that email domain here.
 // Leave empty if people sign in with their real email.
 const USERNAME_EMAIL_DOMAIN = '';
-const COL = { courses:'golf_courses', data:'golf_courseData', comments:'golf_comments', profiles:'golf_profiles', scores:'golf_scores' };
+const COL = { courses:'golf_courses', data:'golf_courseData', comments:'golf_comments', profiles:'golf_profiles', scores:'golf_scores', invites:'golf_invites', redemptions:'golf_redemptions' };
 let fbPromise = null, fbState = 'connecting', pubBusy = false, user = null, playerName = '';
 const isOwner = () => !!(user && curCourse.source === 'online' && curCourse.ownerId && curCourse.ownerId === user.uid);
+const canEdit = () => isOwner() || !!(user && curCourse.source === 'online' && Array.isArray(curCourse.coOwners) && curCourse.coOwners.includes(user.uid));
 const okName = n => typeof n === 'string' && n.length > 0 && n.length <= 20;
 const defaultName = () => String((user && (user.displayName || (user.email || '').split('@')[0])) || 'Player').slice(0, 20) || 'Player';
 
@@ -1576,6 +1675,7 @@ async function loadCommunity(){
       communityList.push({
         id:d.id, source:'online', name:v.name.slice(0, 20), par:(Number.isInteger(v.par) && v.par > 0 && v.par <= 90) ? v.par : null,
         ownerId:typeof v.ownerId === 'string' ? v.ownerId : null, ownerName:typeof v.ownerName === 'string' ? v.ownerName.slice(0, 20) : '',
+        coOwners:Array.isArray(v.coOwners) ? v.coOwners.filter(x => typeof x === 'string') : [],
         thumb:(typeof v.thumb === 'string' && v.thumb.startsWith('data:image/jpeg;base64,')) ? v.thumb : '',
         locked:!!v.locked, reviewCount, rating:ratingCount > 0 ? ratingSum / ratingCount : 0,
         updatedMs:(v.updatedAt && v.updatedAt.toMillis) ? v.updatedAt.toMillis() : 0,
@@ -1612,7 +1712,7 @@ async function publishOnline(asNew){
     const { fs, db } = await withTimeout(getFB(), 10000);
     const owner = playerName || defaultName();
     const data = serialize(), thumb = thumbOf(data), par = totalPar();
-    const update = curCourse.source === 'online' && isOwner() && !asNew;
+    const update = curCourse.source === 'online' && canEdit() && !asNew;
     const cref = update ? fs.doc(db, COL.courses, curCourse.id) : fs.doc(fs.collection(db, COL.courses));
     const batch = fs.writeBatch(db);
     if (update) batch.update(cref, { name:courseName, par, thumb, ownerName:owner, locked:courseLocked, updatedAt:fs.serverTimestamp() });
@@ -1828,7 +1928,7 @@ function openReviews(){
   }
   box.appendChild(msg);
   const stars5 = n => '★'.repeat(n) + '☆'.repeat(5 - n);
-  const canDelete = c => online ? !!(user && (c.uid === user.uid || (role === 'editor' && isOwner()))) : role === 'editor';
+  const canDelete = c => online ? !!(user && (c.uid === user.uid || (role === 'editor' && canEdit()))) : role === 'editor';
   async function refresh(){
     list.innerHTML = ''; list.appendChild(el('p', { className:'muted' }, 'Loading...'));
     try {
@@ -1916,7 +2016,7 @@ function cardEl(it, label, canDelete){
   body.append(el('div', { className:'cc-title' }, it.name), el('div', { className:'cc-meta' }, bits.join('  |  ')));
   const acts = el('div', { className:'cc-actions' });
   const play = el('button', { className:'btn sm primary' }, 'Play'); play.disabled = !it.par; play.onclick = () => openCourse(it, 'viewer');
-  const lockedOut = it.source === 'online' && it.locked && !(user && it.ownerId === user.uid);
+  const lockedOut = it.source === 'online' && it.locked && !(user && (it.ownerId === user.uid || (it.coOwners || []).includes(user.uid)));
   if (!lockedOut){ const edit = el('button', { className:'btn sm' }, 'Edit'); edit.onclick = () => openCourse(it, 'editor'); acts.append(edit); }
   acts.prepend(play);
   if (canDelete){
@@ -1969,8 +2069,8 @@ async function openCourse(rec, wantRole){
     else if (rec.source === 'local') obj = JSON.parse(rec.data);
     else { notify('Loading ' + rec.name + '...'); obj = await fetchOnlineData(rec.id); }
     loadData(obj);
-    courseName = rec.name; curCourse = { id:rec.id, source:rec.source, ownerId:rec.ownerId || null };
-    const ready = allHolesReady(), lockedOut = rec.source === 'online' && rec.locked && !isOwner();
+    courseName = rec.name; curCourse = { id:rec.id, source:rec.source, ownerId:rec.ownerId || null, coOwners:rec.coOwners || [] };
+    const ready = allHolesReady(), lockedOut = rec.source === 'online' && rec.locked && !canEdit();
     let forcedViewer = false;
     if (wantRole === 'editor' && lockedOut){
       if (!ready){ toast('This course is locked and unfinished, so it cannot be opened'); showMenu(); return; }
@@ -1981,7 +2081,7 @@ async function openCourse(rec, wantRole){
     showGame(); chainBounds = null;
     if (role === 'viewer'){ startPlay(); if (forcedViewer) toast('This course is locked: you can play it, but not edit it'); }
     else if (wantRole === 'viewer') toast('This course is not finished yet, so you are editing');
-    else if (rec.source === 'online' && !isOwner()) toast('Not your course: Publish saves your own copy');
+    else if (rec.source === 'online' && !canEdit()) toast('Not your course: Publish saves your own copy');
   } catch (e) { console.error(e); notify('Could not open that course. ' + fbError(e)); }
 }
 function saveLocal(){
@@ -1995,9 +2095,80 @@ function saveLocal(){
 }
 
 /* ---- Course Link: chain several of your own courses into one continuous round ---- */
+/* ---- co-owner invites: owner generates a short code, anyone signed in can redeem it once ---- */
+function genInviteCode(){
+  const abc = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; let c = '';
+  for (let i = 0; i < 6; i++) c += abc[Math.floor(Math.random() * abc.length)];
+  return c;
+}
+async function openInviteCoOwner(){
+  if (!curCourse.id || curCourse.source !== 'online'){ toast('Publish this course first, then you can invite co-owners'); return; }
+  if (!isOwner()){ toast('Only the course owner can invite co-owners'); return; }
+  if (!user){ openSignIn(() => openInviteCoOwner()); return; }
+  const box = el('div'), msg = el('div', { className:'muted' });
+  box.appendChild(el('p', {}, 'Generates a one-time code. Send it to someone and they can redeem it to become a co-owner, able to edit and update this course.'));
+  box.appendChild(msg);
+  const close = modal('Invite a co-owner', box, [
+    { label:'Generate code', cls:'primary', fn:() => {
+        msg.textContent = 'Working...';
+        (async () => {
+          try {
+            const { fs, db } = await withTimeout(getFB(), 10000);
+            const code = genInviteCode();
+            await withTimeout(fs.setDoc(fs.doc(db, COL.invites, code), {
+              courseId:curCourse.id, courseName, ownerId:user.uid, used:false, createdAt:fs.serverTimestamp(),
+            }), 12000);
+            msg.innerHTML = ''; msg.appendChild(el('p', {}, 'Code: ' + code));
+            msg.appendChild(el('p', { className:'muted' }, 'Share this with one person. It works once.'));
+          } catch (e) { console.error(e); msg.textContent = fbError(e); }
+        })();
+        return true;
+    } },
+    { label:'Close' },
+  ]);
+}
+function openRedeemInvite(){
+  if (!user){ openSignIn(() => openRedeemInvite()); return; }
+  const box = el('div');
+  box.appendChild(el('p', { className:'muted' }, "Enter a co-owner invite code someone shared with you. You'll be able to edit and update that course."));
+  const code = el('input', { className:'text', maxLength:6, placeholder:'CODE', style:'text-transform:uppercase' });
+  const msg = el('div', { className:'muted' });
+  box.append(code, msg);
+  modal('Redeem invite', box, [
+    { label:'Redeem', cls:'primary', fn:() => {
+        const v = code.value.trim().toUpperCase();
+        if (v.length !== 6){ msg.textContent = 'Codes are 6 characters.'; return true; }
+        msg.textContent = 'Working...';
+        (async () => {
+          try {
+            const { fs, db } = await withTimeout(getFB(), 10000);
+            const invRef = fs.doc(db, COL.invites, v);
+            const invSnap = await withTimeout(fs.getDoc(invRef), 12000);
+            if (!invSnap.exists() || invSnap.data().used){ msg.textContent = 'That code is invalid or already used.'; return; }
+            const courseId = invSnap.data().courseId;
+            const cRef = fs.doc(db, COL.courses, courseId);
+            const cSnap = await withTimeout(fs.getDoc(cRef), 12000);
+            if (!cSnap.exists()){ msg.textContent = 'That course no longer exists.'; return; }
+            if (cSnap.data().ownerId === user.uid || (cSnap.data().coOwners || []).includes(user.uid)){
+              msg.textContent = "You're already a co-owner of that course."; return;
+            }
+            const batch = fs.writeBatch(db);
+            batch.set(fs.doc(db, COL.courses, courseId, COL.redemptions, user.uid), { code:v, at:fs.serverTimestamp() });
+            batch.update(invRef, { used:true, usedBy:user.uid });
+            batch.update(cRef, { coOwners:fs.arrayUnion(user.uid) });
+            await withTimeout(batch.commit(), 15000);
+            msg.textContent = 'Done! You are now a co-owner of "' + (cSnap.data().name || 'that course') + '".';
+            communityList = null;
+          } catch (e) { console.error(e); msg.textContent = fbError(e); }
+        })();
+        return true;
+    } },
+    { label:'Close' },
+  ]);
+}
 function openCourseLink(){
   if (!curCourse.id){ toast('Save or publish this course first, then you can link it'); return; }
-  if (curCourse.source === 'online' && !isOwner()){ toast('You can only link courses you own'); return; }
+  if (curCourse.source === 'online' && !canEdit()){ toast('You can only link courses you own or co-own'); return; }
   const myRef = { id:curCourse.id, source:curCourse.source, name:courseName, par:totalPar(), thumb:thumbOf(serialize()) };
   const key = refKey(myRef);
   const box = el('div');
@@ -2171,9 +2342,10 @@ function setRole(r){
     if (!allHolesReady()){ toast('Every hole needs a tee spot and a hole before viewing'); return; }
     role = 'viewer'; chainBounds = null; startPlay();
   } else {
+    if (curCourse.source === 'online' && courseLocked && !canEdit()){ toast('This course is locked: you can play it, but not edit it'); return; }
     role = 'editor'; mode = 'edit'; aim = null; round = null; $('result').classList.remove('show');
     loadHoleIntoActive(editHoleBeforePlay); syncUI();
-    if (curCourse.source === 'online' && !isOwner()) toast('Not your course: Publish saves your own copy');
+    if (curCourse.source === 'online' && !canEdit()) toast('Not your course: Publish saves your own copy');
   }
 }
 
@@ -2345,7 +2517,7 @@ function checkPortals(){
   if (!portals.length) return;
   if (ball.portalCd > 0){ ball.portalCd--; return; }
   for (const p of portals){
-    if (Math.hypot(ball.x - p.x - .5, ball.y - p.y - .5) > 2.1 * PORTAL_SCALE) continue;
+    if (Math.hypot(ball.x - p.x - .5, ball.y - p.y - .5) > 2.1 * PORTAL_SCALE * (p.scale || 1)) continue;
     const partner = portals.find(q => q !== p && q.color === p.color);
     if (!partner) continue;
     spawnBurst(ball.x, ball.y, 14, [PORTAL_COLORS[p.color], '#fff'], 1.3, 1, Math.round(2 * PORTAL_SCALE));
@@ -2356,7 +2528,7 @@ function checkPortals(){
   }
 }
 function drawOnePortal(p, t, paired){
-  const cx = p.x + .5, cy = p.y + .5, col = PORTAL_COLORS[p.color], s = PORTAL_SCALE;
+  const cx = p.x + .5, cy = p.y + .5, col = PORTAL_COLORS[p.color], s = PORTAL_SCALE * (p.scale || 1);
   rect(cx - 2 * s, cy + 2 * s, Math.round(5 * s), Math.max(1, Math.round(1 * s)), 'rgba(0,0,0,.25)');
   ctx.globalAlpha = paired ? 1 : 0.4;
   for (let ring = 3; ring >= 1; ring--){
@@ -2502,36 +2674,63 @@ cv.addEventListener('pointerdown', e => {
   }
   if (role !== 'editor') return;
   const erase = e.button === 2, c = cell(p);
-  if (tool === 'brush'){
-    pushUndo(); dragging = { erase }; lastPt = c;
-    stamp(c.x, c.y, erase ? T.VOID : cur);
-  } else if (tool === 'fill'){
-    pushUndo(); floodFill(c.x, c.y, erase ? T.VOID : cur);
-  } else if (isHeightTool(tool)){
-    pushUndo(); hBase = elev.slice(); hW = new Float32Array(W*H);
-    dragging = { height:true, sign:erase ? -1 : 1 }; lastPt = c;
-    heightStamp(c.x, c.y, dragging.sign);
-  } else if (tool === 'deco'){
-    if (erase) removeDecoAt(p); else placeDeco(p);      // no dragging: one click, one decoration
-  } else if (tool === 'undeco'){
-    removeDecoAt(p);
-  } else if (tool === 'hazard'){
-    if (erase) removeHazardAt(p); else placeHazard(p);  // no dragging: one click, one hazard
-  } else if (tool === 'unhazard'){
-    removeHazardAt(p);
-  } else if (tool === 'portal'){
-    if (erase) removePortalAt(p); else placePortal(p);  // no dragging: one click, one portal
-  } else if (tool === 'unportal'){
-    removePortalAt(p);
-  } else { pushUndo(); dragging = { marker:tool }; placeMarker(tool, c); }
+  if (tool === 'tee' || tool === 'hole'){
+    pushUndo(); dragging = { marker:tool }; placeMarker(tool, c); return;
+  }
+  if (editCat === 'terrain'){
+    if (editMode === 'build'){
+      if (terrainStyle === 'paint'){ pushUndo(); dragging = { erase:false }; lastPt = c; stamp(c.x, c.y, cur); }
+      else if (terrainStyle === 'fill'){ pushUndo(); floodFill(c.x, c.y, cur); }
+      else { // raise / lower / flatten
+        pushUndo(); hBase = elev.slice(); hW = new Float32Array(W*H);
+        dragging = { height:true, sign:erase ? -1 : 1, style:terrainStyle }; lastPt = c;
+        heightStamp(c.x, c.y, dragging.sign);
+      }
+    } else if (editMode === 'remove'){
+      pushUndo(); dragging = { erase:true }; lastPt = c; stamp(c.x, c.y, T.VOID);
+    } else if (editMode === 'select'){
+      const t = terrain[c.y * W + c.x];
+      toast((TERRAINS.find(x => x.id === t) || { name:'Nothing' }).name);
+    }
+    return;
+  }
+  // decor / hazards / special
+  if (editMode === 'build'){
+    if (editCat === 'decor') placeDeco(p);
+    else if (editCat === 'hazards') placeHazard(p);
+    else if (editCat === 'special') placePortal(p);
+  } else if (editMode === 'remove'){
+    if (editCat === 'decor') removeDecoAt(p);
+    else if (editCat === 'hazards') removeHazardAt(p);
+    else if (editCat === 'special') removePortalAt(p);
+  } else if (editMode === 'select'){
+    trySelect(p);
+  } else if (editMode === 'move'){
+    tryStartMove(p);
+  } else if (editMode === 'shape'){
+    const picked = trySelect(p);
+    if (picked){
+      const arr = catArr(selectedObj.cat), o = arr[selectedObj.idx];
+      pushUndo();
+      dragging = { shapeStart:{ x:o.x, y:o.y }, shapeBase:shapeValueOf(selectedObj) };
+    }
+  }
 });
 cv.addEventListener('pointermove', e => {
   const p = toPt(e); hover = p;
+  if (dragging && dragging.shapeStart && selectedObj){
+    const d0 = 4, d1 = Math.hypot(p.x - dragging.shapeStart.x, p.y - dragging.shapeStart.y);
+    const v = clamp(dragging.shapeBase * (1 + (d1 - d0) / 14), 0.4, 4);
+    applyShape(selectedObj, v);
+    $('shapeSlider').value = Math.round(v * 100); $('shapeVal').textContent = Math.round(v * 100) + '%';
+    return;
+  }
   if (mode === 'play'){ if (aim){ aim = p; updatePower(); } return; }
   if (!dragging) return;
   const c = cell(p);
   if (dragging.marker) placeMarker(dragging.marker, c);
   else if (dragging.height){ strokeLine(lastPt, c, (x, y) => heightStamp(x, y, dragging.sign)); lastPt = c; }
+  else if (dragging.moveCat) applyMove(dragging.moveCat, dragging.moveIdx, p);
   else { const t = dragging.erase ? T.VOID : cur; strokeLine(lastPt, c, (x, y) => stamp(x, y, t)); lastPt = c; }
 });
 function endPointer(){
@@ -2542,6 +2741,7 @@ function endPointer(){
     }
     aim = null; updatePower(); return;
   }
+  if (dragging && dragging.moveCat === 'deco') rebuildSolids();
   dragging = null; lastPt = null;
 }
 cv.addEventListener('pointerup', endPointer);
@@ -2556,7 +2756,7 @@ TERRAINS.forEach(t => {
   b.dataset.terrain = t.id;
   const chip = el('span', { className:'chip' }); chip.style.background = t.color;
   b.append(chip, document.createTextNode(t.name));
-  b.onclick = () => { cur = t.id; if (tool !== 'brush' && tool !== 'fill') tool = 'brush'; syncUI(); };
+  b.onclick = () => { cur = t.id; editCat = 'terrain'; syncUI(); };
   $('terrains').appendChild(b);
 });
 const icv = document.createElement('canvas'); icv.width = 20; icv.height = 24;
@@ -2569,7 +2769,7 @@ function decoIconURL(i){
 DECOS.forEach((d, i) => {
   const b = el('button', { className:'btn terrain-btn' }); b.dataset.deco = i;
   b.append(el('img', { className:'deco-icon', src:decoIconURL(i), alt:'' }), document.createTextNode(d.name));
-  b.onclick = () => { curDeco = i; tool = 'deco'; syncUI(); };
+  b.onclick = () => { curDeco = i; editCat = 'decor'; if (editMode !== 'build') editMode = 'build'; syncUI(); };
   $('decos').appendChild(b);
 });
 const PORTAL_NAMES = ['Blue', 'Purple', 'Orange', 'Green'];
@@ -2577,12 +2777,30 @@ PORTAL_COLORS.forEach((c, i) => {
   const b = el('button', { className:'btn terrain-btn' }); b.dataset.portal = i;
   const chip = el('span', { className:'chip' }); chip.style.background = c; chip.style.borderRadius = '50%';
   b.append(chip, document.createTextNode(PORTAL_NAMES[i] + ' portal'));
-  b.onclick = () => { curPortalColor = i; tool = 'portal'; syncUI(); };
+  b.onclick = () => { curPortalColor = i; editCat = 'special'; if (editMode !== 'build') editMode = 'build'; syncUI(); };
   $('portalColors').appendChild(b);
 });
-document.querySelectorAll('[data-tool]').forEach(b => b.onclick = () => { tool = b.dataset.tool; if (b.dataset.haz) curHazKind = b.dataset.haz; syncUI(); });
+document.querySelectorAll('[data-tool]').forEach(b => b.onclick = () => { tool = tool === b.dataset.tool ? null : b.dataset.tool; syncUI(); });
+document.querySelectorAll('[data-haz]').forEach(b => b.onclick = () => { curHazKind = b.dataset.haz; editCat = 'hazards'; if (editMode !== 'build') editMode = 'build'; syncUI(); });
 $('hazSpeed').oninput = e => { hazSpeed = +e.target.value; syncUI(); };
 $('hazAxisBtn').onclick = () => { curHazAxis = curHazAxis === 'h' ? 'v' : 'h'; syncUI(); };
+document.querySelectorAll('[data-mode]').forEach(b => b.onclick = () => {
+  editMode = b.dataset.mode; tool = null; selectedObj = null;
+  if (editCat === 'terrain' && (editMode === 'move' || editMode === 'shape')) editMode = 'build';
+  syncUI();
+});
+document.querySelectorAll('[data-cat]').forEach(b => b.onclick = () => {
+  editCat = b.dataset.cat; tool = null; selectedObj = null;
+  if (editCat === 'terrain' && (editMode === 'move' || editMode === 'shape')) editMode = 'build';
+  syncUI();
+});
+document.querySelectorAll('[data-tstyle]').forEach(b => b.onclick = () => { terrainStyle = b.dataset.tstyle; syncUI(); });
+$('shapeSlider').oninput = e => {
+  if (!selectedObj) return;
+  const v = +e.target.value / 100;
+  applyShape(selectedObj, v);
+  $('shapeVal').textContent = e.target.value + '%';
+};
 document.querySelectorAll('#clubs .btn').forEach(b => b.onclick = () => { clubMode = b.dataset.club; syncUI(); });
 document.querySelectorAll('#roleSeg .btn').forEach(b => b.onclick = () => setRole(b.dataset.role));
 $('size').oninput = e => { brushSize = +e.target.value; syncUI(); };
@@ -2606,6 +2824,7 @@ $('pubBtn').onclick = () => publishOnline(false);
 $('pubNewBtn').onclick = () => publishOnline(true);
 $('shareBtn').onclick = openShare;
 $('linkBtn').onclick = openCourseLink;
+$('inviteBtn').onclick = openInviteCoOwner;
 $('clubWoodBtn').onclick = () => {
   if (allowedClubs.includes('driver')){ if (allowedClubs.length < 2){ toast('At least one club has to stay on'); return; } allowedClubs = allowedClubs.filter(c => c !== 'driver'); }
   else allowedClubs = allowedClubs.concat('driver');
@@ -2635,6 +2854,7 @@ $('tabChains').onclick = () => { menuTab = 'chains'; renderMenu(); };
 $('commSort').onchange = e => { commSort = e.target.value; sortCommunity(); renderMenu(); };
 $('achBtn').onclick = openAchievements;
 $('mNew').onclick = openNew; $('mImport').onclick = openImport;
+$('mRedeem').onclick = openRedeemInvite;
 $('authBtn').onclick = () => user ? openAccount() : openSignIn();
 $('mRefresh').onclick = () => { if (fbState === 'ok') loadCommunity(); else if (fbState === 'fail') initOnline(); else renderMenu(); };
 
@@ -2658,25 +2878,65 @@ function syncUI(){
   $('playersBtn').textContent = 'Players (' + players.length + ')';
   $('playersBtn').disabled = mode === 'play';
   document.querySelectorAll('#roleSeg .btn').forEach(b => b.classList.toggle('on', b.dataset.role === role));
+  const lockedForMe = curCourse.source === 'online' && courseLocked && !canEdit();
+  $('roleSeg').querySelector('[data-role="editor"]').disabled = lockedForMe;
   $('modeTabs').hidden = !editor; $('backBtn').hidden = !editor;
   $('tabEdit').classList.toggle('on', edit); $('tabPlay').classList.toggle('on', !edit);
-  document.querySelectorAll('[data-tool]').forEach(b => b.classList.toggle('on', b.dataset.tool === tool && (!b.dataset.haz || b.dataset.haz === curHazKind)));
+  document.querySelectorAll('[data-tool]').forEach(b => b.classList.toggle('on', b.dataset.tool === tool));
   $('hazSpeedVal').textContent = hazSpeed; $('hazSpeed').value = hazSpeed;
   $('hazAxisBtn').textContent = 'Slider: ' + (curHazAxis === 'h' ? 'horizontal' : 'vertical');
-  $('hazAxisBtn').disabled = tool === 'hazard' && curHazKind !== 'slide';
-  document.querySelectorAll('[data-deco]').forEach(b => b.classList.toggle('on', tool === 'deco' && +b.dataset.deco === curDeco));
-  document.querySelectorAll('[data-portal]').forEach(b => b.classList.toggle('on', tool === 'portal' && +b.dataset.portal === curPortalColor));
+  $('hazAxisBtn').disabled = curHazKind !== 'slide';
+  document.querySelectorAll('[data-deco]').forEach(b => b.classList.toggle('on', +b.dataset.deco === curDeco));
+  document.querySelectorAll('[data-portal]').forEach(b => b.classList.toggle('on', +b.dataset.portal === curPortalColor));
+  document.querySelectorAll('[data-haz]').forEach(b => b.classList.toggle('on', b.dataset.haz === curHazKind));
+  document.querySelectorAll('[data-cat]').forEach(b => b.classList.toggle('on', b.dataset.cat === editCat));
+  document.querySelectorAll('[data-mode]').forEach(b => {
+    b.classList.toggle('on', b.dataset.mode === editMode);
+    b.disabled = editCat === 'terrain' && (b.dataset.mode === 'move' || b.dataset.mode === 'shape');
+  });
+  document.querySelectorAll('[data-tstyle]').forEach(b => b.classList.toggle('on', b.dataset.tstyle === terrainStyle));
+  ['terrain', 'decor', 'hazards', 'special'].forEach(c => { $('catPanel-' + c).hidden = editCat !== c; });
+  $('heightExtra').hidden = !(editCat === 'terrain' && editMode === 'build' && isHeightTool(terrainStyle));
+  $('shapePanel').hidden = editMode !== 'shape';
+  if (editMode === 'shape'){
+    if (selectedObj && catArr(selectedObj.cat) && catArr(selectedObj.cat)[selectedObj.idx]){
+      const pct = Math.round(shapeValueOf(selectedObj) * 100);
+      $('shapeInfo').textContent = 'Shaping: ' + catLabel(selectedObj.cat);
+      $('shapeSlider').disabled = false; $('shapeSlider').value = pct; $('shapeVal').textContent = pct + '%';
+    } else {
+      $('shapeInfo').textContent = 'Click a decoration, hazard or portal to shape it.';
+      $('shapeSlider').disabled = true; $('shapeVal').textContent = '—';
+    }
+  }
+  $('decorNote').textContent = editMode === 'build' ? 'Click to place one. Dragging does not place more.'
+    : editMode === 'remove' ? 'Click a decoration to remove it.'
+    : editMode === 'move' ? 'Drag a decoration to move it.'
+    : editMode === 'select' ? 'Click a decoration to select it.' : 'Pick Build to place one.';
+  $('hazNote').textContent = editMode === 'build' ? 'Click to place one. A spinner rotates in place; a slider slides back and forth.'
+    : editMode === 'remove' ? 'Click a hazard to remove it.'
+    : editMode === 'move' ? 'Drag a hazard to move it.'
+    : editMode === 'select' ? 'Click a hazard to select it.' : 'Pick Build to place one.';
+  $('specialNote').textContent = editMode === 'build' ? 'Place two of the same color to link them — rolling into one sends the ball out the other.'
+    : editMode === 'remove' ? 'Click a portal to remove it.'
+    : editMode === 'move' ? 'Drag a portal to move it.'
+    : editMode === 'select' ? 'Click a portal to select it.' : 'Pick Build to place one.';
+  $('modeNote').textContent = {
+    select:'Click something to see what it is. Selecting a decoration, hazard or portal also lets Move and Shape act on it.',
+    move:'Drag a decoration, hazard or portal to reposition it.',
+    shape:'Click a decoration, hazard or portal, then use the slider below to resize it.',
+    build:'The usual tool: paint terrain or place whatever is picked in the tab below.',
+    remove:'Click to remove. For terrain this erases with the brush below.',
+  }[editMode] || '';
   $('clubWoodBtn').textContent = 'Wood: ' + (allowedClubs.includes('driver') ? 'on' : 'off');
   $('clubWoodBtn').classList.toggle('on', allowedClubs.includes('driver'));
   $('clubPutterBtn').textContent = 'Putter: ' + (allowedClubs.includes('putter') ? 'on' : 'off');
   $('clubPutterBtn').classList.toggle('on', allowedClubs.includes('putter'));
   $('lockBtn').textContent = courseLocked ? 'Locked — only you can edit it' : 'Unlocked — anyone can copy this';
   $('lockBtn').classList.toggle('on', courseLocked);
-  document.querySelectorAll('#terrains .btn').forEach(b => {
-    const paints = tool === 'brush' || tool === 'fill';
-    b.classList.toggle('on', +b.dataset.terrain === cur && paints);
-    b.classList.toggle('dim', !paints);
-  });
+  const ownerOnly = curCourse.source === 'online' && !isOwner();
+  $('lockBtn').disabled = ownerOnly; $('inviteBtn').disabled = ownerOnly;
+  $('inviteBtn').hidden = curCourse.source !== 'online';
+  document.querySelectorAll('#terrains .btn').forEach(b => b.classList.toggle('on', +b.dataset.terrain === cur));
   document.querySelectorAll('#clubs .btn').forEach(b => {
     b.classList.toggle('on', b.dataset.club === clubMode);
     b.hidden = b.dataset.club !== 'auto' && !allowedClubs.includes(b.dataset.club);
@@ -2687,7 +2947,7 @@ function syncUI(){
   if (document.activeElement !== $('nameIn')) $('nameIn').value = courseName;
   setText('gTitle', courseName || 'Untitled');
   $('undoBtn').disabled = !undoStack.length; $('redoBtn').disabled = !redoStack.length;
-  const online = curCourse.source === 'online', owned = isOwner();
+  const online = curCourse.source === 'online', owned = canEdit();
   $('pubBtn').textContent = online ? (owned ? 'Update online' : 'Publish as new') : 'Publish online';
   $('pubNewBtn').hidden = !(online && owned);
   $('pubBtn').disabled = pubBusy; $('pubNewBtn').disabled = pubBusy;
@@ -2701,15 +2961,11 @@ function syncUI(){
   $('hint').textContent = !edit
     ? (editor ? 'Drag back from anywhere and let go to swing. Wind pushes shots in the air, walls bounce the ball, and downhill rolls faster. Keys: R restart, C club, E edit.'
               : 'Viewer mode: drag back from anywhere and let go to swing. Wind pushes shots in the air. Press Reviews to leave a comment.')
-    : (tool === 'deco' || tool === 'undeco')
-      ? 'Click to place one decoration. Dragging does not place more. Right-click removes the nearest one.'
-      : (tool === 'hazard' || tool === 'unhazard')
-        ? 'Click to place one moving hazard. Right-click removes the nearest one. Balls bounce off them while they move.'
-        : (tool === 'portal' || tool === 'unportal')
-          ? 'Click to place one portal. Two of the same color teleport the ball between them. Right-click removes the nearest one.'
-          : 'Drag to paint. Right-click erases to void (or reverses raise and lower). Switch holes above, or add up to 18. Keys: B brush, F fill, R raise, L lower, G flatten, T tee, H hole, D decorate, Z hazard, P portal, 1-9 terrain, [ ] size, Ctrl+Z undo.';
+    : (tool === 'tee' || tool === 'hole')
+      ? 'Click the course to place the ' + tool + '.'
+      : 'Keys: 1-5 switch mode, T tee, H hole, [ ] brush size, Ctrl+Z undo.';
   cv.style.cursor = edit ? 'crosshair' : 'grab';
-  const heat = isHeightTool(tool) && edit;
+  const heat = editCat === 'terrain' && editMode === 'build' && isHeightTool(terrainStyle) && edit;
   if (heat !== lastHeat){ lastHeat = heat; dirty = true; }
   if (!edit) {
     setText('pName', courseName); setText('pPar', String(par || '-'));
@@ -2738,10 +2994,12 @@ window.addEventListener('keydown', e => {
     if ((e.ctrlKey || e.metaKey) && k === 'z'){ e.preventDefault(); e.shiftKey ? redo() : undo(); return; }
     if ((e.ctrlKey || e.metaKey) && k === 'y'){ e.preventDefault(); redo(); return; }
     if (e.ctrlKey || e.metaKey || e.altKey) return;
-    if (k === 'b') tool = 'brush'; else if (k === 'f') tool = 'fill'; else if (k === 't') tool = 'tee'; else if (k === 'h') tool = 'hole';
-    else if (k === 'r') tool = 'raise'; else if (k === 'l') tool = 'lower'; else if (k === 'g') tool = 'flat'; else if (k === 'd') tool = 'deco';
-    else if (k === 'z') tool = 'hazard'; else if (k === 'p') tool = 'portal';
-    else if (k >= '1' && k <= '9'){ cur = +k - 1; if (tool !== 'brush' && tool !== 'fill') tool = 'brush'; }
+    if (k === 't') tool = tool === 'tee' ? null : 'tee'; else if (k === 'h') tool = tool === 'hole' ? null : 'hole';
+    else if (k === '1'){ editMode = 'select'; tool = null; selectedObj = null; }
+    else if (k === '2'){ editMode = editCat === 'terrain' ? editMode : 'move'; tool = null; selectedObj = null; }
+    else if (k === '3'){ editMode = editCat === 'terrain' ? editMode : 'shape'; tool = null; selectedObj = null; }
+    else if (k === '4'){ editMode = 'build'; tool = null; selectedObj = null; }
+    else if (k === '5'){ editMode = 'remove'; tool = null; selectedObj = null; }
     else if (k === '[') brushSize = Math.max(1, brushSize - 1);
     else if (k === ']') brushSize = Math.min(20, brushSize + 1);
     else return;

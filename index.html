@@ -297,6 +297,13 @@ input[type=range]{width:100%;accent-color:var(--accent);margin:4px 0 0}
           <div class="panel" id="catPanel-special">
             <h2>Portals</h2>
             <div class="grid2" id="portalColors"></div>
+            <h2 style="margin:14px 0 4px">Other specials</h2>
+            <div class="grid2">
+              <button class="btn" data-special="speedpad" title="Redirects and boosts the ball to 1.75x speed, facing the way it's rotated">Speed pad</button>
+              <button class="btn" data-special="jumppad" title="Launches the ball into the air at 1.5x speed, more if it was already fast">Jump pad</button>
+              <button class="btn span2" data-special="blackhole" title="Pulls the ball in. Fast enough and it slingshots around; too slow and it's swallowed for a penalty">Black hole</button>
+              <button class="btn span2" data-special="rail" title="Drag to draw a track. The ball locks onto it and follows it">Rail (drag to draw)</button>
+            </div>
             <p class="note" id="specialNote"></p>
           </div>
 
@@ -439,6 +446,8 @@ const elev = new Int8Array(W*H);
 let decos = [];
 let hazards = [];
 let portals = [];
+let specials = []; // speedpad / jumppad / blackhole
+let rails = [];    // [{ points:[{x,y},...] }, ...]
 const decoSolid = new Uint8Array(W*H);
 let decoSorted = [];
 let tee = null, hole = null;
@@ -446,11 +455,16 @@ let courseName = 'My course';
 let tool = null, cur = 1, curDeco = 0, brushSize = 6, hstep = 6, hardEdge = false;
 let curHazKind = 'spin', curHazAxis = 'h', hazSpeed = 3;
 let curPortalColor = 0;
+let curSpecialKind = 'portal'; // 'portal' | 'speedpad' | 'jumppad' | 'blackhole' | 'rail'
 let editCat = 'terrain', editMode = 'build', terrainStyle = 'paint';
-let selectedObj = null; // { cat:'deco'|'hazard'|'portal', idx }
+let selectedObj = null; // { cat:'deco'|'hazard'|'portal'|'special', idx }
+let rotating = false;
 let courseLocked = false, allowedClubs = ['driver', 'putter'];
 const HAZ_PERIOD = { 1:4.4, 2:3.2, 3:2.2, 4:1.5, 5:1.0 };
 const HAZ_KINDS = ['slide', 'spin', 'pendulum', 'popper'];
+const SPECIAL_KINDS = ['speedpad', 'jumppad', 'blackhole'];
+const MAX_SPECIALS = 14, MAX_RAILS = 10, MAX_RAIL_PTS = 60;
+const JUMP_THRESHOLD = 2.0, BLACKHOLE_THRESHOLD = 2.2, BLACKHOLE_RADIUS = 20, BLACKHOLE_ORBIT_S = 2;
 let mode = 'edit', role = 'editor', screen = 'menu';
 let curCourse = { id:null, source:'new' };
 let changed = false;
@@ -463,7 +477,7 @@ let holes = [], curHole = 0, editHoleBeforePlay = 0;
 let players = [{ name:'You' }], round = null;
 let chainBounds = null, chainReturnWorld = null;
 
-const ball = { x:0, y:0, vx:0, vy:0, z:0, air:false, t:0, T:1, H:10, sink:0, holed:false, moving:false, lx:0, ly:0, portalCd:0 };
+const ball = { x:0, y:0, vx:0, vy:0, z:0, air:false, t:0, T:1, H:10, sink:0, holed:false, moving:false, lx:0, ly:0, portalCd:0, padCd:0, blackhole:null, onRail:null };
 let strokes = 0, clubMode = 'auto', aim = null;
 let swing = null, lastFace = 1;
 const SWING_IMPACT = 7, SWING_END = 24;
@@ -521,13 +535,13 @@ const calcPar = () => parOf(tee, hole);
    above are always the currently checked-out hole; `holes[]` holds the rest. ---- */
 function blankHole(fill){
   const t = new Uint8Array(W*H); if (fill !== undefined) t.fill(fill);
-  return { terrain:t, elev:new Int8Array(W*H), decos:[], hazards:[], portals:[], tee:null, hole:null, undo:[], redo:[] };
+  return { terrain:t, elev:new Int8Array(W*H), decos:[], hazards:[], portals:[], specials:[], rails:[], tee:null, hole:null, undo:[], redo:[] };
 }
-function commitHole(){ holes[curHole] = { terrain, elev:elev.slice(), decos, hazards, portals, tee, hole, undo:undoStack, redo:redoStack }; }
+function commitHole(){ holes[curHole] = { terrain, elev:elev.slice(), decos, hazards, portals, specials, rails, tee, hole, undo:undoStack, redo:redoStack }; }
 function loadHoleIntoActive(i){
   curHole = i;
   const h = holes[i];
-  terrain = h.terrain; elev.set(h.elev); decos = h.decos.map(d => ({...d})); hazards = (h.hazards || []).map(z => ({...z})); portals = (h.portals || []).map(p => ({...p})); tee = h.tee; hole = h.hole;
+  terrain = h.terrain; elev.set(h.elev); decos = h.decos.map(d => ({...d})); hazards = (h.hazards || []).map(z => ({...z})); portals = (h.portals || []).map(p => ({...p})); specials = (h.specials || []).map(z => ({...z})); rails = (h.rails || []).map(r => ({ points:r.points.map(pt => ({...pt})) })); tee = h.tee; hole = h.hole;
   undoStack = h.undo || []; redoStack = h.redo || [];
   rebuildSolids(); dirty = true;
 }
@@ -1093,7 +1107,7 @@ function drawStaticSprites(now){
   if (hole) drawHole(hole);
   if (tee) drawTee(tee, true);
   for (const d of decoSorted) drawDeco(d, now);
-  drawHazards(now * 0.001); drawPortals(now * 0.001);
+  drawRails(); drawHazards(now * 0.001); drawPortals(now * 0.001); drawSpecials(now * 0.001);
   if (hole) drawFlag(hole, now);
 }
 function render(now){
@@ -1114,9 +1128,15 @@ function render(now){
     if (selectedObj){
       const arr = catArr(selectedObj.cat), o = arr && arr[selectedObj.idx];
       if (o){
-        const r = selectedObj.cat === 'deco' ? 6 : selectedObj.cat === 'hazard' ? 15 : 10 * PORTAL_SCALE;
+        const r = selectedObj.cat === 'deco' ? 6 : selectedObj.cat === 'hazard' ? 15 : selectedObj.cat === 'special' ? 10 : 10 * PORTAL_SCALE;
         ctx.strokeStyle = '#fff'; ctx.setLineDash([2, 2]);
         ctx.strokeRect(o.x - r, o.y - r - 6, r * 2, r * 2 + 8); ctx.setLineDash([]);
+        if (selectedObj.cat === 'hazard' || selectedObj.cat === 'special'){
+          const ar = (o.angle || 0) * Math.PI / 180, ex = o.x + Math.cos(ar) * (r + 4), ey = o.y + Math.sin(ar) * (r + 4);
+          ctx.strokeStyle = rotating ? '#ffd23f' : '#9be0ff';
+          ctx.beginPath(); ctx.moveTo(o.x + .5, o.y + .5); ctx.lineTo(ex + .5, ey + .5); ctx.stroke();
+          rect(Math.round(ex) - 1, Math.round(ey) - 1, 2, 2, rotating ? '#ffd23f' : '#9be0ff');
+        }
       } else selectedObj = null;
     }
     if (hover){
@@ -1135,7 +1155,9 @@ function render(now){
         ctx.globalAlpha = 1;
       }
       else if (editCat === 'hazards' && editMode === 'remove') xRemove(hx, hy);
-      else if (editCat === 'special' && editMode === 'build'){ ctx.globalAlpha = .7; drawOnePortal({ color:curPortalColor, x:hx, y:hy, scale:1 }, now * 0.001, true); ctx.globalAlpha = 1; }
+      else if (editCat === 'special' && curSpecialKind === 'portal' && editMode === 'build'){ ctx.globalAlpha = .7; drawOnePortal({ color:curPortalColor, x:hx, y:hy, scale:1 }, now * 0.001, true); ctx.globalAlpha = 1; }
+      else if (editCat === 'special' && curSpecialKind === 'rail' && (editMode === 'build' || editMode === 'remove')){ ctx.fillStyle = '#b8bac2'; ctx.fillRect(hx - 1, hy - 1, 2, 2); }
+      else if (editCat === 'special' && curSpecialKind !== 'portal' && curSpecialKind !== 'rail' && editMode === 'build'){ ctx.globalAlpha = .7; drawOneSpecial({ kind:curSpecialKind, x:hx, y:hy, angle:0, scale:1 }, now * 0.001); ctx.globalAlpha = 1; }
       else if (editCat === 'special' && editMode === 'remove') xRemove(hx, hy);
     }
   } else {
@@ -1154,7 +1176,7 @@ function render(now){
     }
     drawGolfer(now);
     for (const d of below) drawDeco(d, now);
-    drawHazards(simTime); drawPortals(simTime);
+    drawRails(); drawHazards(simTime); drawPortals(simTime); drawSpecials(simTime);
     if (hole) drawFlag(hole, now);
     drawAim();
     drawWindIndicator();
@@ -1165,8 +1187,8 @@ function render(now){
 /* ================================================================== *
  *  EDITING
  * ================================================================== */
-const snapshot = () => ({ t:terrain.slice(), e:elev.slice(), tee:tee && {...tee}, hole:hole && {...hole}, d:decos.map(d => ({...d})), z:hazards.map(z => ({...z})), p:portals.map(p => ({...p})) });
-function restoreSnap(s){ terrain = s.t.slice(); elev.set(s.e); tee = s.tee && {...s.tee}; hole = s.hole && {...s.hole}; decos = s.d.map(d => ({...d})); hazards = s.z.map(z => ({...z})); portals = s.p.map(p => ({...p})); rebuildSolids(); dirty = true; }
+const snapshot = () => ({ t:terrain.slice(), e:elev.slice(), tee:tee && {...tee}, hole:hole && {...hole}, d:decos.map(d => ({...d})), z:hazards.map(z => ({...z})), p:portals.map(p => ({...p})), sp:specials.map(z => ({...z})), r:rails.map(r => ({ points:r.points.map(pt => ({...pt})) })) });
+function restoreSnap(s){ terrain = s.t.slice(); elev.set(s.e); tee = s.tee && {...s.tee}; hole = s.hole && {...s.hole}; decos = s.d.map(d => ({...d})); hazards = s.z.map(z => ({...z})); portals = s.p.map(p => ({...p})); specials = s.sp.map(z => ({...z})); rails = s.r.map(r => ({ points:r.points.map(pt => ({...pt})) })); rebuildSolids(); dirty = true; }
 function pushUndo(){ undoStack.push(snapshot()); if (undoStack.length > 40) undoStack.shift(); redoStack.length = 0; changed = true; syncUI(); }
 function undo(){ if (!undoStack.length) return; redoStack.push(snapshot()); restoreSnap(undoStack.pop()); changed = true; syncUI(); }
 function redo(){ if (!redoStack.length) return; undoStack.push(snapshot()); restoreSnap(redoStack.pop()); changed = true; syncUI(); }
@@ -1236,6 +1258,8 @@ function clearAround(m){
   decos = decos.filter(d => !(DECOS[d.t].solid && Math.hypot(d.x - m.x, d.y - m.y) < 8));
   hazards = hazards.filter(z => Math.hypot(z.x - m.x, z.y - m.y) >= 12);
   portals = portals.filter(p => Math.hypot(p.x - m.x, p.y - m.y) >= 10);
+  specials = specials.filter(z => Math.hypot(z.x - m.x, z.y - m.y) >= 12);
+  rails = rails.filter(r => r.points.every(pt => Math.hypot(pt.x - m.x, pt.y - m.y) >= 8));
   rebuildSolids();
   dirty = true;
 }
@@ -1275,7 +1299,7 @@ function placeHazard(p){
   if ([tee, hole].some(m => m && Math.hypot(m.x - x, m.y - y) < 12)){ toast('Too close to the tee or hole'); return; }
   if (hazards.some(z => Math.hypot(z.x - x, z.y - y) < 10)){ toast('Too close to another hazard'); return; }
   pushUndo();
-  hazards.push({ kind:curHazKind, x, y, len:curHazKind === 'spin' ? 13 : 11, period:HAZ_PERIOD[hazSpeed], phase:Math.random() * Math.PI * 2, axis:curHazAxis });
+  hazards.push({ kind:curHazKind, x, y, len:curHazKind === 'spin' ? 13 : 11, period:HAZ_PERIOD[hazSpeed], phase:Math.random() * Math.PI * 2, angle:curHazAxis === 'v' ? 90 : 0 });
 }
 function removeHazardAt(p){
   let best = -1, bd = 14;
@@ -1302,19 +1326,67 @@ function removePortalAt(p){
   if (best < 0){ toast('No portal there'); return; }
   pushUndo(); portals.splice(best, 1);
 }
+function placeSpecial(p){
+  const x = Math.floor(p.x), y = Math.floor(p.y);
+  if (specials.length >= MAX_SPECIALS){ toast('That is plenty of specials!'); return; }
+  const margin = 14;
+  if (x < margin || y < margin*0.6 || x >= W - margin || y >= H - margin*0.6){ toast("Can't place it there — too close to the edge"); return; }
+  const t = terrain[y*W + x];
+  if (t === T.VOID || t === T.WATER || t === T.MOUNTAIN){ toast('Place it on open land'); return; }
+  if ([tee, hole].some(m => m && Math.hypot(m.x - x, m.y - y) < 12)){ toast('Too close to the tee or hole'); return; }
+  if (specials.some(z => Math.hypot(z.x - x, z.y - y) < 10)){ toast('Too close to another special'); return; }
+  pushUndo();
+  specials.push({ kind:curSpecialKind, x, y, angle:0, scale:1 });
+}
+function removeSpecialAt(p){
+  let best = -1, bd = 12;
+  specials.forEach((z, i) => { const d = Math.hypot(z.x - p.x, z.y - p.y); if (d < bd){ bd = d; best = i; } });
+  if (best < 0){ toast('No special there'); return; }
+  pushUndo(); specials.splice(best, 1);
+}
+/* ---- rails: drawn as a polyline, 2px wide ---- */
+function railStart(p){
+  if (rails.length >= MAX_RAILS){ toast('That is plenty of rails!'); return; }
+  pushUndo();
+  dragging = { rail:{ points:[{ x:Math.round(p.x), y:Math.round(p.y) }] } };
+}
+function railExtend(p){
+  if (!dragging || !dragging.rail) return;
+  const pts = dragging.rail.points, last = pts[pts.length - 1];
+  const x = Math.round(p.x), y = Math.round(p.y);
+  if (Math.hypot(x - last.x, y - last.y) < 2.5) return;
+  if (pts.length >= MAX_RAIL_PTS) return;
+  pts.push({ x, y });
+  dirty = true;
+}
+function railFinish(){
+  if (!dragging || !dragging.rail) return;
+  if (dragging.rail.points.length >= 2) rails.push(dragging.rail);
+  dragging = null;
+}
+function removeRailAt(p){
+  let best = -1, bd = 6;
+  rails.forEach((r, i) => {
+    for (const pt of r.points){ const d = Math.hypot(pt.x - p.x, pt.y - p.y); if (d < bd){ bd = d; best = i; } }
+  });
+  if (best < 0){ toast('No rail there'); return; }
+  pushUndo(); rails.splice(best, 1);
+}
 /* ---- Select / Move / Shape: shared across decor, hazards, special ---- */
-const catArr = cat => cat === 'deco' ? decos : cat === 'hazard' ? hazards : cat === 'portal' ? portals : null;
-const catLabel = cat => cat === 'deco' ? 'decoration' : cat === 'hazard' ? 'hazard' : 'portal';
+const catArr = cat => cat === 'deco' ? decos : cat === 'hazard' ? hazards : cat === 'portal' ? portals : cat === 'special' ? specials : null;
+const catLabel = cat => cat === 'deco' ? 'decoration' : cat === 'hazard' ? 'hazard' : cat === 'special' ? 'special' : 'portal';
 function findNearest(cat, p, maxDist){
   const arr = catArr(cat); if (!arr) return -1;
   let best = -1, bd = maxDist;
   arr.forEach((o, i) => { const d = Math.hypot(o.x - p.x, o.y - p.y); if (d < bd){ bd = d; best = i; } });
   return best;
 }
-const activeCat = () => editCat === 'decor' ? 'deco' : editCat === 'hazards' ? 'hazard' : editCat === 'special' ? 'portal' : null;
+const activeCat = () => editCat === 'decor' ? 'deco' : editCat === 'hazards' ? 'hazard'
+  : editCat === 'special' ? (curSpecialKind === 'portal' ? 'portal' : curSpecialKind === 'rail' ? null : 'special') : null;
 function hitRadius(cat, o){
   if (cat === 'deco') return 6 * (o.scale || 1) + 4;
   if (cat === 'hazard') return o.len + 6;
+  if (cat === 'special') return 10;
   return 10 * PORTAL_SCALE * (o.scale || 1) + 4;
 }
 function findNearestGenerous(cat, p){
@@ -1353,6 +1425,7 @@ function applyShape(sel, v){
   if (sel.cat === 'deco'){ o.scale = v; rebuildSolids(); }
   else if (sel.cat === 'hazard'){ o.len = clamp(Math.round(12 * v), 4, 48); }
   else if (sel.cat === 'portal'){ o.scale = v; }
+  else if (sel.cat === 'special'){ o.scale = v; }
   dirty = true;
 }
 function newCourse(name, fill){
@@ -1452,8 +1525,10 @@ function serialize(){
     v:4, name:courseName, w:W, h:H, locked:courseLocked, clubs:allowedClubs,
     holes: holes.map(h => ({
       tee:h.tee, hole:h.hole, rle:rleEnc(h.terrain), erle:rleEnc(h.elev), decos:h.decos.map(d => [d.t, d.x, d.y, Math.round((d.scale || 1) * 20)]),
-      hz:(h.hazards || []).map(z => [HAZ_KINDS.indexOf(z.kind), z.x, z.y, Math.round(z.len), Math.round(z.period * 10), Math.round(z.phase * 100), z.axis === 'v' ? 1 : 0]),
+      hz:(h.hazards || []).map(z => [HAZ_KINDS.indexOf(z.kind), z.x, z.y, Math.round(z.len), Math.round(z.period * 10), Math.round(z.phase * 100), Math.round(z.angle || 0)]),
       pt:(h.portals || []).map(p => [p.color, p.x, p.y, Math.round((p.scale || 1) * 20)]),
+      sp:(h.specials || []).map(z => [SPECIAL_KINDS.indexOf(z.kind), z.x, z.y, Math.round(z.angle || 0), Math.round((z.scale || 1) * 20)]),
+      rl:(h.rails || []).map(r => r.points.map(pt => [pt.x, pt.y])),
     })),
   };
 }
@@ -1474,14 +1549,29 @@ function parseHoles(o, cap = MAX_HOLES){
     if (Array.isArray(hd.hz)) for (const a of hd.hz.slice(0, MAX_HAZARDS)){
       if (Array.isArray(a) && Number.isFinite(a[1]) && Number.isFinite(a[2])) zs.push({
         kind:HAZ_KINDS[a[0]] || 'slide', x:clamp(a[1]|0, 0, W-1), y:clamp(a[2]|0, 0, H-1),
-        len:clamp(Number(a[3]) || 12, 4, 30), period:clamp((Number(a[4]) || 22) / 10, 0.6, 8), phase:(Number(a[5]) || 0) / 100, axis:a[6] === 1 ? 'v' : 'h',
+        len:clamp(Number(a[3]) || 12, 4, 48), period:clamp((Number(a[4]) || 22) / 10, 0.6, 8),
+        phase:(Number(a[5]) || 0) / 100, angle:(a[6] === 1 ? 90 : Number.isFinite(a[6]) ? ((a[6] % 360) + 360) % 360 : 0),
       });
+    }
+    const sps = [];
+    if (Array.isArray(hd.sp)) for (const a of hd.sp.slice(0, MAX_SPECIALS)){
+      if (Array.isArray(a) && Number.isInteger(a[0]) && a[0] >= 0 && a[0] < SPECIAL_KINDS.length && Number.isFinite(a[1]) && Number.isFinite(a[2])) sps.push({
+        kind:SPECIAL_KINDS[a[0]], x:clamp(a[1]|0, 0, W-1), y:clamp(a[2]|0, 0, H-1),
+        angle:Number.isFinite(a[3]) ? ((a[3] % 360) + 360) % 360 : 0, scale:clamp((Number(a[4]) || 20) / 20, 0.4, 4),
+      });
+    }
+    const rls = [];
+    if (Array.isArray(hd.rl)) for (const r of hd.rl.slice(0, MAX_RAILS)){
+      if (!Array.isArray(r)) continue;
+      const pts = r.slice(0, MAX_RAIL_PTS).filter(pt => Array.isArray(pt) && Number.isFinite(pt[0]) && Number.isFinite(pt[1]))
+        .map(pt => ({ x:clamp(pt[0]|0, 0, W-1), y:clamp(pt[1]|0, 0, H-1) }));
+      if (pts.length >= 2) rls.push({ points:pts });
     }
     const ps = [];
     if (Array.isArray(hd.pt)) for (const a of hd.pt.slice(0, MAX_PORTALS)){
       if (Array.isArray(a) && Number.isInteger(a[0]) && a[0] >= 0 && a[0] < PORTAL_COLORS.length && Number.isFinite(a[1]) && Number.isFinite(a[2])) ps.push({ color:a[0], x:clamp(a[1]|0, 0, W-1), y:clamp(a[2]|0, 0, H-1), scale:clamp((Number(a[3]) || 20) / 20, 0.4, 4) });
     }
-    return { terrain:t, elev:e, decos:ds, hazards:zs, portals:ps, tee:ok(hd.tee), hole:ok(hd.hole), undo:[], redo:[] };
+    return { terrain:t, elev:e, decos:ds, hazards:zs, portals:ps, specials:sps, rails:rls, tee:ok(hd.tee), hole:ok(hd.hole), undo:[], redo:[] };
   });
 }
 function applyData(o){
@@ -2318,7 +2408,8 @@ function canAim(){ return mode === 'play' && !swing && !react && !ball.moving &&
 function resetBall(){
   ball.x = tee.x + .5; ball.y = tee.y + .5; ball.vx = ball.vy = 0; ball.z = 0;
   ball.air = false; ball.sink = 0; ball.holed = false; ball.moving = false;
-  ball.lx = ball.x; ball.ly = ball.y; ball.portalCd = 0; strokes = 0; aim = null; swing = null; react = null; parts.length = 0;
+  ball.lx = ball.x; ball.ly = ball.y; ball.portalCd = 0; ball.padCd = 0; ball.blackhole = null; ball.onRail = null;
+  strokes = 0; aim = null; swing = null; react = null; parts.length = 0;
   $('result').classList.remove('show');
 }
 function startPlay(){
@@ -2378,6 +2469,9 @@ function penalty(kind){
     startReact('sulk');
     const a = achState(); a.splash = (a.splash || 0) + 1; lsSet(K_ACH, a); if (a.splash >= 5) unlock('splash');
     spawnBurst(ball.x, ball.y, 26, ['#b9dcff', '#fff', '#5a9be0'], 1.6, 1.5); sfx.splash(); toast('Splash! +1 stroke');
+  } else if (kind === 'blackhole'){
+    startReact('sulk');
+    spawnBurst(ball.x, ball.y, 20, ['#3a2a52', '#1a1030', '#6a4ba0'], 1.3, .6); beep(140, .4, 'sine', .04, -100); toast('Swallowed by the black hole! +1 stroke');
   } else {
     spawnBurst(ball.x, ball.y, 14, ['#ffd23f', '#fff'], 1.2, 1); sfx.oob(); toast('Out of bounds! +1 stroke');
   }
@@ -2449,14 +2543,15 @@ function hazardCircles(t){
   const out = [];
   for (const hz of hazards){
     if (hz.kind === 'slide'){
-      const off = Math.sin((t / hz.period) * Math.PI * 2 + hz.phase) * hz.len;
-      out.push({ x:hz.x + (hz.axis === 'v' ? 0 : off), y:hz.y + (hz.axis === 'v' ? off : 0), r:2.6, hz, off });
+      const off = Math.sin((t / hz.period) * Math.PI * 2 + hz.phase) * hz.len, ar = (hz.angle || 0) * Math.PI / 180;
+      out.push({ x:hz.x + Math.cos(ar) * off, y:hz.y + Math.sin(ar) * off, r:2.6, hz, off });
     } else if (hz.kind === 'spin'){
       const a = (t / hz.period) * Math.PI * 2 + hz.phase;
       out.push({ x:hz.x + Math.cos(a) * hz.len, y:hz.y + Math.sin(a) * hz.len, r:1.7, hz, a });
       out.push({ x:hz.x - Math.cos(a) * hz.len, y:hz.y - Math.sin(a) * hz.len, r:1.7, hz, a: a + Math.PI });
     } else if (hz.kind === 'pendulum'){
-      const a = Math.PI / 2 + Math.sin((t / hz.period) * Math.PI * 2 + hz.phase) * 1.05;
+      const base = Math.PI / 2 + (hz.angle || 0) * Math.PI / 180;
+      const a = base + Math.sin((t / hz.period) * Math.PI * 2 + hz.phase) * 1.05;
       out.push({ x:hz.x + Math.cos(a) * hz.len, y:hz.y + Math.sin(a) * hz.len, r:1.9, hz, a });
     } else if (hz.kind === 'popper'){
       const u = (Math.sin((t / hz.period) * Math.PI * 2 + hz.phase) + 1) / 2;
@@ -2481,11 +2576,13 @@ function checkHazards(){
 }
 function drawOneHazard(hz, t){
   if (hz.kind === 'slide'){
-    const off = Math.sin((t / hz.period) * Math.PI * 2 + hz.phase) * hz.len;
-    const cx = hz.x + (hz.axis === 'v' ? 0 : off), cy = hz.y + (hz.axis === 'v' ? off : 0);
-    rect(cx - 3, cy + 2, 7, 1, 'rgba(0,0,0,.28)');
-    rect(cx - 3, cy - 2, 7, 5, '#8a5a34'); rect(cx - 3, cy - 2, 7, 1, '#a8703c'); rect(cx - 3, cy + 2, 7, 1, '#5e3a20');
-    rect(cx - 2, cy - 1, 5, 1, '#c48a4c');
+    const off = Math.sin((t / hz.period) * Math.PI * 2 + hz.phase) * hz.len, ar = (hz.angle || 0) * Math.PI / 180;
+    const cx = hz.x + Math.cos(ar) * off, cy = hz.y + Math.sin(ar) * off;
+    ctx.save(); ctx.translate(cx, cy); ctx.rotate(ar);
+    rect(-3, 2, 7, 1, 'rgba(0,0,0,.28)');
+    rect(-3, -2, 7, 5, '#8a5a34'); rect(-3, -2, 7, 1, '#a8703c'); rect(-3, 2, 7, 1, '#5e3a20');
+    rect(-2, -1, 5, 1, '#c48a4c');
+    ctx.restore();
   } else if (hz.kind === 'spin'){
     const a = (t / hz.period) * Math.PI * 2 + hz.phase;
     rect(hz.x - 1, hz.y - 1, 3, 3, 'rgba(0,0,0,.22)');
@@ -2496,7 +2593,8 @@ function drawOneHazard(hz, t){
     }
     rect(hz.x - 1, hz.y - 1, 2, 2, '#3a2a20');
   } else if (hz.kind === 'pendulum'){
-    const a = Math.PI / 2 + Math.sin((t / hz.period) * Math.PI * 2 + hz.phase) * 1.05;
+    const base = Math.PI / 2 + (hz.angle || 0) * Math.PI / 180;
+    const a = base + Math.sin((t / hz.period) * Math.PI * 2 + hz.phase) * 1.05;
     const ex = hz.x + Math.cos(a) * hz.len, ey = hz.y + Math.sin(a) * hz.len;
     rect(Math.round(ex) - 1, hz.y + hz.len + 1, 3, 1, 'rgba(0,0,0,.2)');
     rect(hz.x - 2, hz.y - 2, 5, 2, '#5e3a20'); rect(hz.x - 1, hz.y - 1, 3, 1, '#3a2a20');
@@ -2544,9 +2642,164 @@ function drawOnePortal(p, t, paired){
 function drawPortals(t){
   for (const p of portals) drawOnePortal(p, t, portals.some(q => q !== p && q.color === p.color));
 }
+/* ---- speed pad / jump pad / black hole ---- */
+function stepBlackholeOrbit(){
+  const bh = specials[ball.blackhole.idx];
+  if (!bh){ ball.blackhole = null; return; }
+  ball.blackhole.t++;
+  ball.blackhole.ang += 0.26;
+  ball.x = bh.x + .5 + Math.cos(ball.blackhole.ang) * ball.blackhole.radius;
+  ball.y = bh.y + .5 + Math.sin(ball.blackhole.ang) * ball.blackhole.radius;
+  if (ball.blackhole.t >= ball.blackhole.dur){
+    const exitAng = ball.blackhole.ang + Math.PI / 2, sp = ball.blackhole.exitSpeed;
+    ball.vx = Math.cos(exitAng) * sp; ball.vy = Math.sin(exitAng) * sp;
+    ball.blackhole = null;
+    sfx.bounce();
+  }
+}
+function checkSpecials(){
+  if (!specials.length) return;
+  if (ball.padCd > 0) ball.padCd--;
+  for (const sp of specials){
+    const cx = sp.x + .5, cy = sp.y + .5, d = Math.hypot(ball.x - cx, ball.y - cy);
+    if (sp.kind === 'blackhole'){
+      const scale = sp.scale || 1, R = BLACKHOLE_RADIUS * scale, cap = 2.6 * scale;
+      if (d >= R) continue;
+      if (d < cap){
+        const speed = Math.hypot(ball.vx, ball.vy);
+        if (speed > BLACKHOLE_THRESHOLD){
+          const ang0 = Math.atan2(ball.y - cy, ball.x - cx);
+          ball.blackhole = { idx:specials.indexOf(sp), t:0, dur:Math.round(BLACKHOLE_ORBIT_S * 60), ang:ang0, radius:cap, exitSpeed:speed };
+          ball.vx = 0; ball.vy = 0;
+          spawnBurst(ball.x, ball.y, 10, ['#6a4ba0', '#3a2a52'], .8, .6);
+        } else {
+          penalty('blackhole');
+        }
+        return;
+      }
+      const pull = 0.03 * scale * (1 - d / R);
+      ball.vx += (cx - ball.x) / d * pull; ball.vy += (cy - ball.y) / d * pull;
+      continue;
+    }
+    if (ball.padCd > 0 || d > 2.4 * (sp.scale || 1)) continue;
+    const speed = Math.hypot(ball.vx, ball.vy);
+    if (speed < 0.08) continue;
+    const rad = (sp.angle || 0) * Math.PI / 180;
+    if (sp.kind === 'speedpad'){
+      const boosted = speed * 1.75;
+      ball.vx = Math.cos(rad) * boosted; ball.vy = Math.sin(rad) * boosted;
+      ball.padCd = 16; sfx.hit();
+      spawnBurst(ball.x, ball.y, 10, ['#ffd23f', '#fff'], 1.2, .8);
+    } else if (sp.kind === 'jumppad'){
+      const ux = ball.vx / speed, uy = ball.vy / speed;
+      let launch = speed * 1.5;
+      if (speed > JUMP_THRESHOLD) launch *= 1.5;
+      ball.vx = ux * launch; ball.vy = uy * launch;
+      ball.air = true; ball.t = 0;
+      ball.T = clamp(Math.round(10 + launch * 5), 10, 40);
+      ball.H = clamp(launch * 3.2, 4, 30);
+      ball.padCd = 16; sfx.hit();
+      spawnBurst(ball.x, ball.y, 10, ['#e8d08e', '#fff'], 1, .8);
+    }
+  }
+}
+function drawOneSpecial(sp, t){
+  const x = sp.x, y = sp.y, s = sp.scale || 1, rad = (sp.angle || 0) * Math.PI / 180;
+  if (sp.kind === 'speedpad'){
+    ctx.save(); ctx.translate(x, y); ctx.rotate(rad); ctx.scale(s, s);
+    rect(-4, 3, 9, 1, 'rgba(0,0,0,.22)');
+    rect(-4, -3, 9, 6, '#2f8f4e'); rect(-4, -3, 9, 1, '#4fc06e');
+    for (let i = 0; i < 3; i++) rect(-1 + i * 2, -2, 1, 4, '#eaffea');
+    ctx.restore();
+  } else if (sp.kind === 'jumppad'){
+    ctx.save(); ctx.translate(x, y); ctx.rotate(rad); ctx.scale(s, s);
+    rect(-4, 3, 9, 1, 'rgba(0,0,0,.22)');
+    rect(-4, -2, 9, 5, '#e8923b'); rect(-4, -2, 9, 1, '#f8b863');
+    rect(-1, -4, 3, 2, '#f8b863');
+    ctx.restore();
+  } else if (sp.kind === 'blackhole'){
+    const R = BLACKHOLE_RADIUS * s;
+    ctx.globalAlpha = 0.14; ctx.strokeStyle = '#6a4ba0';
+    for (let rr = R; rr > 4; rr -= 5){ ctx.beginPath(); ctx.arc(x + .5, y + .5, rr, 0, Math.PI * 2); ctx.stroke(); }
+    ctx.globalAlpha = 1;
+    for (let k = 0; k < 8; k++){
+      const a = t * 3 + k * Math.PI / 4, rr = 4 + ((t * 2 + k) % 4);
+      rect(Math.round(x + .5 + Math.cos(a) * rr), Math.round(y + .5 + Math.sin(a) * rr), 1, 1, '#8a6bc0');
+    }
+    rect(x - 2, y - 2, 5, 5, '#120a20'); rect(x - 1, y - 1, 3, 3, '#000');
+  }
+}
+function drawSpecials(t){ for (const sp of specials) drawOneSpecial(sp, t); }
+/* ---- rails ---- */
+function nearestOnRail(rail, x, y){
+  let best = null, bd = Infinity;
+  for (let i = 0; i < rail.points.length - 1; i++){
+    const a = rail.points[i], b = rail.points[i+1];
+    const dx = b.x - a.x, dy = b.y - a.y, len = Math.hypot(dx, dy) || 0.0001;
+    let t = ((x - a.x) * dx + (y - a.y) * dy) / (len * len); t = clamp(t, 0, 1);
+    const px = a.x + dx * t, py = a.y + dy * t, d = Math.hypot(x - px, y - py);
+    if (d < bd){ bd = d; best = { segIdx:i, t, x:px, y:py, ux:dx / len, uy:dy / len }; }
+  }
+  return best ? { ...best, dist:bd } : null;
+}
+function railPointAt(rail, segIdx, t){ const a = rail.points[segIdx], b = rail.points[segIdx+1]; return { x:a.x + (b.x-a.x)*t, y:a.y + (b.y-a.y)*t }; }
+function railTangent(rail, segIdx, dir){ const a = rail.points[segIdx], b = rail.points[segIdx+1]; const len = Math.hypot(b.x-a.x, b.y-a.y) || 0.0001; return { x:dir*(b.x-a.x)/len, y:dir*(b.y-a.y)/len }; }
+function checkRails(){
+  if (!rails.length) return;
+  if (ball.onRail){
+    const rail = rails[ball.onRail.railIdx];
+    if (!rail){ ball.onRail = null; return; }
+    let { segIdx, t, dir } = ball.onRail;
+    const speed = Math.hypot(ball.vx, ball.vy);
+    let remaining = speed;
+    while (remaining > 0.0001){
+      const a = rail.points[segIdx], b = rail.points[segIdx + dir];
+      if (!a || !b){ ball.onRail = null; return; }
+      const segLen = Math.hypot(b.x - a.x, b.y - a.y) || 0.0001;
+      const remainT = dir > 0 ? (1 - t) : t, remainDist = remainT * segLen;
+      if (remaining <= remainDist){ t += dir * (remaining / segLen); remaining = 0; }
+      else {
+        remaining -= remainDist; segIdx += dir; t = dir > 0 ? 0 : 1;
+        if (segIdx < 0 || segIdx >= rail.points.length - 1){ ball.onRail = null; break; }
+      }
+    }
+    if (ball.onRail){
+      ball.onRail = { railIdx:ball.onRail.railIdx, segIdx, t, dir };
+      const pos = railPointAt(rail, segIdx, t); ball.x = pos.x; ball.y = pos.y;
+      const tan = railTangent(rail, segIdx, dir);
+      ball.vx = tan.x * speed; ball.vy = tan.y * speed;
+    }
+    return;
+  }
+  const speed = Math.hypot(ball.vx, ball.vy);
+  if (speed < 0.08) return;
+  for (let ri = 0; ri < rails.length; ri++){
+    const near = nearestOnRail(rails[ri], ball.x, ball.y);
+    if (near && near.dist < 1.8){
+      const dot = ball.vx * near.ux + ball.vy * near.uy, dir = dot >= 0 ? 1 : -1;
+      ball.onRail = { railIdx:ri, segIdx:near.segIdx, t:near.t, dir };
+      ball.x = near.x; ball.y = near.y;
+      ball.vx = near.ux * dir * speed; ball.vy = near.uy * dir * speed;
+      return;
+    }
+  }
+}
+function drawRails(){
+  for (const r of rails){
+    for (let i = 0; i < r.points.length - 1; i++){
+      const a = r.points[i], b = r.points[i+1], n = Math.max(1, Math.ceil(Math.hypot(b.x - a.x, b.y - a.y)));
+      for (let k = 0; k <= n; k++){
+        const x = Math.round(a.x + (b.x - a.x) * k / n), y = Math.round(a.y + (b.y - a.y) * k / n);
+        rect(x - 1, y - 1, 2, 1, '#b8bac2'); rect(x - 1, y, 2, 1, '#7a7c84');
+        if (k % 4 === 0) rect(x - 1, y + 1, 2, 1, '#4a4c54');
+      }
+    }
+  }
+}
 function stepBall(){
   if (ball.holed) return;
   if (ball.sink > 0){ ball.sink++; if (ball.sink > 36 && !react) onHoleDone(); return; }
+  if (ball.blackhole){ stepBlackholeOrbit(); return; }
   if (!ball.moving) return;
   if (ball.air){
     ball.t++;
@@ -2561,8 +2814,8 @@ function stepBall(){
   const si = clamp(Math.floor(ball.y), 0, H-1)*W + clamp(Math.floor(ball.x), 0, W-1);
   ball.vx -= SLOPE_K * gxA[si]; ball.vy -= SLOPE_K * gyA[si];
   if (moveBall(Math.max(1, Math.ceil(Math.hypot(ball.vx, ball.vy))), false)) return;
-  checkHazards(); checkPortals();
-  if (!ball.moving) return;
+  checkHazards(); checkPortals(); checkRails(); checkSpecials();
+  if (ball.blackhole || !ball.moving || ball.onRail) return;
   const f = FRIC[clamp(getT(ball.x, ball.y), 0, 8)];
   ball.vx *= f; ball.vy *= f;
   settle();
@@ -2695,14 +2948,19 @@ cv.addEventListener('pointerdown', e => {
     return;
   }
   // decor / hazards / special
+  if (editCat === 'special' && curSpecialKind === 'rail'){
+    if (editMode === 'build') railStart(p);
+    else if (editMode === 'remove') removeRailAt(p);
+    return;
+  }
   if (editMode === 'build'){
     if (editCat === 'decor') placeDeco(p);
     else if (editCat === 'hazards') placeHazard(p);
-    else if (editCat === 'special') placePortal(p);
+    else if (editCat === 'special') (curSpecialKind === 'portal' ? placePortal(p) : placeSpecial(p));
   } else if (editMode === 'remove'){
     if (editCat === 'decor') removeDecoAt(p);
     else if (editCat === 'hazards') removeHazardAt(p);
-    else if (editCat === 'special') removePortalAt(p);
+    else if (editCat === 'special') (curSpecialKind === 'portal' ? removePortalAt(p) : removeSpecialAt(p));
   } else if (editMode === 'select'){
     trySelect(p);
   } else if (editMode === 'move'){
@@ -2731,9 +2989,11 @@ cv.addEventListener('pointermove', e => {
   if (dragging.marker) placeMarker(dragging.marker, c);
   else if (dragging.height){ strokeLine(lastPt, c, (x, y) => heightStamp(x, y, dragging.sign)); lastPt = c; }
   else if (dragging.moveCat) applyMove(dragging.moveCat, dragging.moveIdx, p);
+  else if (dragging.rail) railExtend(p);
   else { const t = dragging.erase ? T.VOID : cur; strokeLine(lastPt, c, (x, y) => stamp(x, y, t)); lastPt = c; }
 });
 function endPointer(){
+  if (dragging && dragging.rail){ railFinish(); return; }
   if (mode === 'play'){
     if (aim && canAim()){
       const dx = ball.x - aim.x, dy = ball.y - aim.y, d = Math.hypot(dx, dy);
@@ -2777,21 +3037,29 @@ PORTAL_COLORS.forEach((c, i) => {
   const b = el('button', { className:'btn terrain-btn' }); b.dataset.portal = i;
   const chip = el('span', { className:'chip' }); chip.style.background = c; chip.style.borderRadius = '50%';
   b.append(chip, document.createTextNode(PORTAL_NAMES[i] + ' portal'));
-  b.onclick = () => { curPortalColor = i; editCat = 'special'; if (editMode !== 'build') editMode = 'build'; syncUI(); };
+  b.onclick = () => { curPortalColor = i; curSpecialKind = 'portal'; editCat = 'special'; if (editMode !== 'build') editMode = 'build'; syncUI(); };
   $('portalColors').appendChild(b);
+});
+document.querySelectorAll('[data-special]').forEach(b => b.onclick = () => {
+  curSpecialKind = b.dataset.special; editCat = 'special';
+  if (curSpecialKind === 'rail'){ if (editMode !== 'build' && editMode !== 'remove') editMode = 'build'; }
+  else if (editMode !== 'build') editMode = 'build';
+  syncUI();
 });
 document.querySelectorAll('[data-tool]').forEach(b => b.onclick = () => { tool = tool === b.dataset.tool ? null : b.dataset.tool; syncUI(); });
 document.querySelectorAll('[data-haz]').forEach(b => b.onclick = () => { curHazKind = b.dataset.haz; editCat = 'hazards'; if (editMode !== 'build') editMode = 'build'; syncUI(); });
 $('hazSpeed').oninput = e => { hazSpeed = +e.target.value; syncUI(); };
 $('hazAxisBtn').onclick = () => { curHazAxis = curHazAxis === 'h' ? 'v' : 'h'; syncUI(); };
+const noMoveShape = () => editCat === 'terrain' || (editCat === 'special' && curSpecialKind === 'rail');
 document.querySelectorAll('[data-mode]').forEach(b => b.onclick = () => {
   editMode = b.dataset.mode; tool = null; selectedObj = null;
-  if (editCat === 'terrain' && (editMode === 'move' || editMode === 'shape')) editMode = 'build';
+  if (noMoveShape() && (editMode === 'move' || editMode === 'shape')) editMode = 'build';
+  if (editCat === 'special' && curSpecialKind === 'rail' && editMode === 'select') editMode = 'build';
   syncUI();
 });
 document.querySelectorAll('[data-cat]').forEach(b => b.onclick = () => {
   editCat = b.dataset.cat; tool = null; selectedObj = null;
-  if (editCat === 'terrain' && (editMode === 'move' || editMode === 'shape')) editMode = 'build';
+  if (noMoveShape() && (editMode === 'move' || editMode === 'shape')) editMode = 'build';
   syncUI();
 });
 document.querySelectorAll('[data-tstyle]').forEach(b => b.onclick = () => { terrainStyle = b.dataset.tstyle; syncUI(); });
@@ -2887,12 +3155,15 @@ function syncUI(){
   $('hazAxisBtn').textContent = 'Slider: ' + (curHazAxis === 'h' ? 'horizontal' : 'vertical');
   $('hazAxisBtn').disabled = curHazKind !== 'slide';
   document.querySelectorAll('[data-deco]').forEach(b => b.classList.toggle('on', +b.dataset.deco === curDeco));
-  document.querySelectorAll('[data-portal]').forEach(b => b.classList.toggle('on', +b.dataset.portal === curPortalColor));
+  document.querySelectorAll('[data-portal]').forEach(b => b.classList.toggle('on', +b.dataset.portal === curPortalColor && curSpecialKind === 'portal'));
   document.querySelectorAll('[data-haz]').forEach(b => b.classList.toggle('on', b.dataset.haz === curHazKind));
+  document.querySelectorAll('[data-special]').forEach(b => b.classList.toggle('on', b.dataset.special === curSpecialKind));
   document.querySelectorAll('[data-cat]').forEach(b => b.classList.toggle('on', b.dataset.cat === editCat));
+  const railNow = editCat === 'special' && curSpecialKind === 'rail';
   document.querySelectorAll('[data-mode]').forEach(b => {
     b.classList.toggle('on', b.dataset.mode === editMode);
-    b.disabled = editCat === 'terrain' && (b.dataset.mode === 'move' || b.dataset.mode === 'shape');
+    b.disabled = (editCat === 'terrain' || railNow) && (b.dataset.mode === 'move' || b.dataset.mode === 'shape');
+    if (railNow && b.dataset.mode === 'select') b.disabled = true;
   });
   document.querySelectorAll('[data-tstyle]').forEach(b => b.classList.toggle('on', b.dataset.tstyle === terrainStyle));
   ['terrain', 'decor', 'hazards', 'special'].forEach(c => { $('catPanel-' + c).hidden = editCat !== c; });
@@ -2916,14 +3187,20 @@ function syncUI(){
     : editMode === 'remove' ? 'Click a hazard to remove it.'
     : editMode === 'move' ? 'Drag a hazard to move it.'
     : editMode === 'select' ? 'Click a hazard to select it.' : 'Pick Build to place one.';
-  $('specialNote').textContent = editMode === 'build' ? 'Place two of the same color to link them — rolling into one sends the ball out the other.'
-    : editMode === 'remove' ? 'Click a portal to remove it.'
-    : editMode === 'move' ? 'Drag a portal to move it.'
-    : editMode === 'select' ? 'Click a portal to select it.' : 'Pick Build to place one.';
+  $('specialNote').textContent = curSpecialKind === 'rail'
+    ? (editMode === 'build' ? 'Drag across the course to draw a track. The ball locks on and follows it.'
+      : editMode === 'remove' ? 'Click near a rail to remove the whole thing.' : 'Rails only support Build and Remove.')
+    : curSpecialKind === 'portal'
+      ? (editMode === 'build' ? 'Place two of the same color to link them — rolling into one sends the ball out the other.'
+        : editMode === 'remove' ? 'Click a portal to remove it.' : editMode === 'move' ? 'Drag a portal to move it.'
+        : editMode === 'select' ? 'Click a portal to select it.' : 'Pick Build to place one.')
+      : (editMode === 'build' ? 'Click to place one. Use R (hold) in Select, Move or Shape mode to rotate it.'
+        : editMode === 'remove' ? 'Click to remove it.' : editMode === 'move' ? 'Drag to move it.'
+        : editMode === 'select' ? 'Click to select it, then hold R to rotate.' : 'Pick Build to place one.');
   $('modeNote').textContent = {
-    select:'Click something to see what it is. Selecting a decoration, hazard or portal also lets Move and Shape act on it.',
+    select:'Click something to see what it is. Selecting a hazard or special also lets you hold R to rotate it.',
     move:'Drag a decoration, hazard or portal to reposition it.',
-    shape:'Click a decoration, hazard or portal, then use the slider below to resize it.',
+    shape:'Click something, then use the slider (or drag on the canvas) to resize it. Hold R to rotate a selected hazard or special.',
     build:'The usual tool: paint terrain or place whatever is picked in the tab below.',
     remove:'Click to remove. For terrain this erases with the brush below.',
   }[editMode] || '';
@@ -2994,6 +3271,10 @@ window.addEventListener('keydown', e => {
     if ((e.ctrlKey || e.metaKey) && k === 'z'){ e.preventDefault(); e.shiftKey ? redo() : undo(); return; }
     if ((e.ctrlKey || e.metaKey) && k === 'y'){ e.preventDefault(); redo(); return; }
     if (e.ctrlKey || e.metaKey || e.altKey) return;
+    if (k === 'r' && selectedObj && (selectedObj.cat === 'hazard' || selectedObj.cat === 'special')){
+      if (!rotating){ pushUndo(); rotating = true; }
+      return;
+    }
     if (k === 't') tool = tool === 'tee' ? null : 'tee'; else if (k === 'h') tool = tool === 'hole' ? null : 'hole';
     else if (k === '1'){ editMode = 'select'; tool = null; selectedObj = null; }
     else if (k === '2'){ editMode = editCat === 'terrain' ? editMode : 'move'; tool = null; selectedObj = null; }
@@ -3010,6 +3291,8 @@ window.addEventListener('keydown', e => {
     else if (k === 'c'){ const o = ['auto', 'driver', 'putter']; clubMode = o[(o.indexOf(clubMode) + 1) % 3]; syncUI(); }
   }
 });
+window.addEventListener('keyup', e => { if (e.key.toLowerCase() === 'r') rotating = false; });
+window.addEventListener('blur', () => { rotating = false; });
 
 /* ---- sizing: integer pixel scale on big screens for crisp pixels ---- */
 function fit(){
@@ -3028,6 +3311,10 @@ let last = performance.now(), acc = 0;
 function frame(now){
   acc += Math.min(100, now - last); last = now;
   while (acc >= 16.667){ acc -= 16.667; if (screen === 'game' && mode === 'play'){ simTime += 0.016667; stepReact(); stepSwing(); stepBall(); } stepParticles(); }
+  if (rotating && selectedObj && screen === 'game' && mode === 'edit'){
+    const arr = catArr(selectedObj.cat), o = arr && arr[selectedObj.idx];
+    if (o) o.angle = ((o.angle || 0) + 3) % 360; else rotating = false;
+  }
   if (screen === 'game'){ updateHUD(); render(now); }
   requestAnimationFrame(frame);
 }

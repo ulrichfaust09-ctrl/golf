@@ -298,12 +298,7 @@ input[type=range]{width:100%;accent-color:var(--accent);margin:4px 0 0}
             <h2>Portals</h2>
             <div class="grid2" id="portalColors"></div>
             <h2 style="margin:14px 0 4px">Other specials</h2>
-            <div class="grid2">
-              <button class="btn" data-special="speedpad" title="Redirects and boosts the ball to 1.75x speed, facing the way it's rotated">Speed pad</button>
-              <button class="btn" data-special="jumppad" title="Launches the ball into the air at 1.5x speed, more if it was already fast">Jump pad</button>
-              <button class="btn span2" data-special="blackhole" title="Pulls the ball in. Fast enough and it slingshots around; too slow and it's swallowed for a penalty">Black hole</button>
-              <button class="btn span2" data-special="rail" title="Drag to draw a track. The ball locks onto it and follows it">Rail (drag to draw)</button>
-            </div>
+            <div class="grid2" id="otherSpecials"></div>
             <p class="note" id="specialNote"></p>
           </div>
 
@@ -459,10 +454,11 @@ let curSpecialKind = 'portal'; // 'portal' | 'speedpad' | 'jumppad' | 'blackhole
 let editCat = 'terrain', editMode = 'build', terrainStyle = 'paint';
 let selectedObj = null; // { cat:'deco'|'hazard'|'portal'|'special', idx }
 let rotating = false;
-let courseLocked = false, allowedClubs = ['driver', 'putter'];
+let courseLocked = false, allowedClubs = ['driver', 'putter'], autoExcluded = [];
+let forcedPutter = false;
 const HAZ_PERIOD = { 1:4.4, 2:3.2, 3:2.2, 4:1.5, 5:1.0 };
 const HAZ_KINDS = ['slide', 'spin', 'pendulum', 'popper'];
-const SPECIAL_KINDS = ['speedpad', 'jumppad', 'blackhole'];
+const SPECIAL_KINDS = ['speedpad', 'jumppad', 'blackhole', 'randoleporter', 'bouncewall', 'checkpoint', 'gravitater'];
 const MAX_SPECIALS = 14, MAX_RAILS = 10, MAX_RAIL_PTS = 60;
 const JUMP_THRESHOLD = 2.0, BLACKHOLE_THRESHOLD = 2.2, BLACKHOLE_RADIUS = 20, BLACKHOLE_ORBIT_S = 2;
 let mode = 'edit', role = 'editor', screen = 'menu';
@@ -477,7 +473,7 @@ let holes = [], curHole = 0, editHoleBeforePlay = 0;
 let players = [{ name:'You' }], round = null;
 let chainBounds = null, chainReturnWorld = null;
 
-const ball = { x:0, y:0, vx:0, vy:0, z:0, air:false, t:0, T:1, H:10, sink:0, holed:false, moving:false, lx:0, ly:0, portalCd:0, padCd:0, blackhole:null, onRail:null };
+const ball = { x:0, y:0, vx:0, vy:0, z:0, air:false, t:0, T:1, H:10, sink:0, holed:false, moving:false, lx:0, ly:0, portalCd:0, padCd:0, blackhole:null, onRail:null, checkpoint:null, lastTeleportRef:null };
 let strokes = 0, clubMode = 'auto', aim = null;
 let swing = null, lastFace = 1;
 const SWING_IMPACT = 7, SWING_END = 24;
@@ -996,9 +992,13 @@ function drawBrushPreview(p){
 
 function maxDrag(){ const sf = cv.clientWidth / W || 1; return clamp(150 / sf, 28, 60); }
 function currentClub(){
+  if (forcedPutter) return 'putter';
   let c = clubMode;
-  if (c === 'auto' || !allowedClubs.includes(c)) c = getT(ball.x, ball.y) === T.GREEN ? 'putter' : 'driver';
-  if (!allowedClubs.includes(c)) c = allowedClubs[0];
+  if (c === 'auto' || !allowedClubs.includes(c)){
+    c = getT(ball.x, ball.y) === T.GREEN ? 'putter' : 'driver';
+    if (autoExcluded.includes(c)) c = c === 'driver' ? 'putter' : 'driver';
+  }
+  if (!allowedClubs.includes(c) || autoExcluded.includes(c)) c = allowedClubs.find(x => !autoExcluded.includes(x)) || allowedClubs[0];
   return c;
 }
 const carryOf = p => 14 + 110*p;
@@ -1336,7 +1336,7 @@ function placeSpecial(p){
   if ([tee, hole].some(m => m && Math.hypot(m.x - x, m.y - y) < 12)){ toast('Too close to the tee or hole'); return; }
   if (specials.some(z => Math.hypot(z.x - x, z.y - y) < 10)){ toast('Too close to another special'); return; }
   pushUndo();
-  specials.push({ kind:curSpecialKind, x, y, angle:0, scale:1 });
+  specials.push({ kind:curSpecialKind, x, y, angle:0, scale:1, len:10 });
 }
 function removeSpecialAt(p){
   let best = -1, bd = 12;
@@ -1431,7 +1431,7 @@ function applyShape(sel, v){
 function newCourse(name, fill){
   holes = [blankHole(fill)]; loadHoleIntoActive(0);
   courseName = name || 'My course'; changed = false; round = null; chainBounds = null;
-  courseLocked = false; allowedClubs = ['driver', 'putter']; selectedObj = null; editMode = 'build'; editCat = 'terrain'; tool = null;
+  courseLocked = false; allowedClubs = ['driver', 'putter']; autoExcluded = []; selectedObj = null; editMode = 'build'; editCat = 'terrain'; tool = null;
 }
 
 /* ---- demo course (two holes, to show off multi-hole play) ---- */
@@ -1499,7 +1499,7 @@ function buildDemo(){
   holes = [hole1(), hole2()];
   loadHoleIntoActive(0);
   courseName = 'Riverside Links'; changed = false; round = null; chainBounds = null;
-  courseLocked = false; allowedClubs = ['driver', 'putter']; selectedObj = null; editMode = 'build'; editCat = 'terrain'; tool = null;
+  courseLocked = false; allowedClubs = ['driver', 'putter']; autoExcluded = []; selectedObj = null; editMode = 'build'; editCat = 'terrain'; tool = null;
 }
 
 /* ================================================================== *
@@ -1522,12 +1522,12 @@ function rleDec(r, Ty, lo, hi){
 function serialize(){
   commitHole();
   return {
-    v:4, name:courseName, w:W, h:H, locked:courseLocked, clubs:allowedClubs,
+    v:4, name:courseName, w:W, h:H, locked:courseLocked, clubs:allowedClubs, autoEx:autoExcluded,
     holes: holes.map(h => ({
       tee:h.tee, hole:h.hole, rle:rleEnc(h.terrain), erle:rleEnc(h.elev), decos:h.decos.map(d => [d.t, d.x, d.y, Math.round((d.scale || 1) * 20)]),
       hz:(h.hazards || []).map(z => [HAZ_KINDS.indexOf(z.kind), z.x, z.y, Math.round(z.len), Math.round(z.period * 10), Math.round(z.phase * 100), Math.round(z.angle || 0)]),
       pt:(h.portals || []).map(p => [p.color, p.x, p.y, Math.round((p.scale || 1) * 20)]),
-      sp:(h.specials || []).map(z => [SPECIAL_KINDS.indexOf(z.kind), z.x, z.y, Math.round(z.angle || 0), Math.round((z.scale || 1) * 20)]),
+      sp:(h.specials || []).map(z => [SPECIAL_KINDS.indexOf(z.kind), z.x, z.y, Math.round(z.angle || 0), Math.round((z.scale || 1) * 20), Math.round(z.len || 10)]),
       rl:(h.rails || []).map(r => r.points.map(pt => [pt.x, pt.y])),
     })),
   };
@@ -1558,6 +1558,7 @@ function parseHoles(o, cap = MAX_HOLES){
       if (Array.isArray(a) && Number.isInteger(a[0]) && a[0] >= 0 && a[0] < SPECIAL_KINDS.length && Number.isFinite(a[1]) && Number.isFinite(a[2])) sps.push({
         kind:SPECIAL_KINDS[a[0]], x:clamp(a[1]|0, 0, W-1), y:clamp(a[2]|0, 0, H-1),
         angle:Number.isFinite(a[3]) ? ((a[3] % 360) + 360) % 360 : 0, scale:clamp((Number(a[4]) || 20) / 20, 0.4, 4),
+        len:clamp(Number(a[5]) || 10, 4, 40),
       });
     }
     const rls = [];
@@ -1580,6 +1581,7 @@ function applyData(o){
   courseLocked = !!o.locked;
   allowedClubs = Array.isArray(o.clubs) ? o.clubs.filter(c => c === 'driver' || c === 'putter') : ['driver', 'putter'];
   if (!allowedClubs.length) allowedClubs = ['driver', 'putter'];
+  autoExcluded = Array.isArray(o.autoEx) ? o.autoEx.filter(c => c === 'driver' || c === 'putter') : [];
   loadHoleIntoActive(0); dirty = true; selectedObj = null; tool = null;
 }
 function loadData(o){ applyData(o); changed = false; round = null; chainBounds = null; syncUI(); }
@@ -2356,7 +2358,7 @@ async function playChain(chain){
     chainReturnWorld = saveWorld();
     holes = allHoles; loadHoleIntoActive(0); chainBounds = bounds;
     curCourse = { id:null, source:'chain', chainId:chain.id };
-    courseName = chain.name; role = 'viewer'; allowedClubs = ['driver', 'putter'];
+    courseName = chain.name; role = 'viewer'; allowedClubs = ['driver', 'putter']; autoExcluded = [];
     showGame(); startPlay();
   } catch (e) { console.error(e); notify('Could not start that chain. ' + (e && e.message ? e.message : fbError(e))); }
 }
@@ -2408,7 +2410,7 @@ function canAim(){ return mode === 'play' && !swing && !react && !ball.moving &&
 function resetBall(){
   ball.x = tee.x + .5; ball.y = tee.y + .5; ball.vx = ball.vy = 0; ball.z = 0;
   ball.air = false; ball.sink = 0; ball.holed = false; ball.moving = false;
-  ball.lx = ball.x; ball.ly = ball.y; ball.portalCd = 0; ball.padCd = 0; ball.blackhole = null; ball.onRail = null;
+  ball.lx = ball.x; ball.ly = ball.y; ball.portalCd = 0; ball.padCd = 0; ball.blackhole = null; ball.onRail = null; ball.checkpoint = null; ball.lastTeleportRef = null; forcedPutter = false;
   strokes = 0; aim = null; swing = null; react = null; parts.length = 0;
   $('result').classList.remove('show');
 }
@@ -2471,11 +2473,12 @@ function penalty(kind){
     spawnBurst(ball.x, ball.y, 26, ['#b9dcff', '#fff', '#5a9be0'], 1.6, 1.5); sfx.splash(); toast('Splash! +1 stroke');
   } else if (kind === 'blackhole'){
     startReact('sulk');
-    spawnBurst(ball.x, ball.y, 20, ['#3a2a52', '#1a1030', '#6a4ba0'], 1.3, .6); beep(140, .4, 'sine', .04, -100); toast('Swallowed by the black hole! +1 stroke');
+    spawnBurst(ball.x, ball.y, 50, ['#3a2a52', '#1a1030', '#6a4ba0', '#8a6bc0'], 1.8, 1.4, 2); beep(140, .4, 'sine', .04, -100); toast('Swallowed by the black hole! +1 stroke');
   } else {
     spawnBurst(ball.x, ball.y, 14, ['#ffd23f', '#fff'], 1.2, 1); sfx.oob(); toast('Out of bounds! +1 stroke');
   }
-  ball.x = ball.lx; ball.y = ball.ly; ball.vx = ball.vy = 0; ball.z = 0; ball.air = false; ball.moving = false;
+  const back = ball.checkpoint ? { x:ball.checkpoint.x + .5, y:ball.checkpoint.y + .5 } : { x:ball.lx, y:ball.ly };
+  ball.x = back.x; ball.y = back.y; ball.vx = ball.vy = 0; ball.z = 0; ball.air = false; ball.moving = false;
 }
 function stopBall(){
   ball.vx = ball.vy = 0; ball.z = 0; ball.air = false; ball.moving = false;
@@ -2619,7 +2622,7 @@ function checkPortals(){
     const partner = portals.find(q => q !== p && q.color === p.color);
     if (!partner) continue;
     spawnBurst(ball.x, ball.y, 14, [PORTAL_COLORS[p.color], '#fff'], 1.3, 1, Math.round(2 * PORTAL_SCALE));
-    ball.x = partner.x + .5; ball.y = partner.y + .5; ball.portalCd = 24;
+    ball.x = partner.x + .5; ball.y = partner.y + .5; ball.portalCd = 24; ball.padCd = Math.max(ball.padCd, 24); ball.lastTeleportRef = partner;
     sfx.portal();
     spawnBurst(ball.x, ball.y, 14, [PORTAL_COLORS[partner.color], '#fff'], 1.3, 1, Math.round(2 * PORTAL_SCALE));
     return;
@@ -2655,13 +2658,53 @@ function stepBlackholeOrbit(){
     ball.vx = Math.cos(exitAng) * sp; ball.vy = Math.sin(exitAng) * sp;
     ball.blackhole = null;
     sfx.bounce();
+    spawnBurst(ball.x, ball.y, 45, ['#6a4ba0', '#8a6bc0', '#fff', '#3a2a52'], 1.7, 1.3, 2);
+  } else if (ball.blackhole.t % 6 === 0){
+    spawnBurst(ball.x, ball.y, 2, ['#6a4ba0', '#8a6bc0'], .4, .2, 1);
+  }
+}
+function segPointDist(x, y, ax, ay, bx, by){
+  const dx = bx - ax, dy = by - ay, len2 = dx * dx + dy * dy || 0.0001;
+  let t = ((x - ax) * dx + (y - ay) * dy) / len2; t = clamp(t, 0, 1);
+  const px = ax + dx * t, py = ay + dy * t;
+  return Math.hypot(x - px, y - py);
+}
+function checkAirSpecials(){
+  for (const sp of specials){
+    if (sp.kind !== 'gravitater') continue;
+    const cx = sp.x + .5, cy = sp.y + .5, R = 16 * (sp.scale || 1);
+    if (Math.hypot(ball.x - cx, ball.y - cy) > R) continue;
+    ball.air = false; ball.z = 0; ball.vx *= 0.15; ball.vy *= 0.15;
+    forcedPutter = true; clubMode = 'putter';
+    spawnBurst(ball.x, ball.y, 16, ['#3a3a44', '#6a6a74', '#9a9aa4'], 1.1, .3, 2);
+    sfx.bounce(); toast('Slammed down! Putter only for this hole.');
+    return;
   }
 }
 function checkSpecials(){
   if (!specials.length) return;
   if (ball.padCd > 0) ball.padCd--;
   for (const sp of specials){
-    const cx = sp.x + .5, cy = sp.y + .5, d = Math.hypot(ball.x - cx, ball.y - cy);
+    const cx = sp.x + .5, cy = sp.y + .5;
+    if (sp.kind === 'bouncewall'){
+      const len = (sp.len || 10) * (sp.scale || 1), rad = (sp.angle || 0) * Math.PI / 180;
+      const ax = cx - Math.cos(rad) * len, ay = cy - Math.sin(rad) * len, bx = cx + Math.cos(rad) * len, by = cy + Math.sin(rad) * len;
+      if (ball.padCd > 0 || segPointDist(ball.x, ball.y, ax, ay, bx, by) > 1.6) continue;
+      const speed = Math.hypot(ball.vx, ball.vy);
+      if (speed < 0.08) continue;
+      const boosted = speed * 1.15;
+      ball.vx = Math.cos(rad) * boosted; ball.vy = Math.sin(rad) * boosted;
+      ball.padCd = 16; sfx.bounce();
+      spawnBurst(ball.x, ball.y, 10, ['#d8443a', '#fff'], 1.1, .7);
+      return;
+    }
+    if (sp.kind === 'checkpoint'){
+      if (Math.hypot(ball.x - cx, ball.y - cy) <= 3 * (sp.scale || 1) && ball.checkpoint !== sp){
+        ball.checkpoint = sp; spawnBurst(ball.x, ball.y, 14, ['#3fb06a', '#fff'], .9, .7); sfx.cup();
+      }
+      continue;
+    }
+    const d = Math.hypot(ball.x - cx, ball.y - cy);
     if (sp.kind === 'blackhole'){
       const scale = sp.scale || 1, R = BLACKHOLE_RADIUS * scale, cap = 2.6 * scale;
       if (d >= R) continue;
@@ -2671,7 +2714,7 @@ function checkSpecials(){
           const ang0 = Math.atan2(ball.y - cy, ball.x - cx);
           ball.blackhole = { idx:specials.indexOf(sp), t:0, dur:Math.round(BLACKHOLE_ORBIT_S * 60), ang:ang0, radius:cap, exitSpeed:speed };
           ball.vx = 0; ball.vy = 0;
-          spawnBurst(ball.x, ball.y, 10, ['#6a4ba0', '#3a2a52'], .8, .6);
+          spawnBurst(ball.x, ball.y, 40, ['#6a4ba0', '#3a2a52', '#8a6bc0', '#fff'], 1.6, 1.2, 2);
         } else {
           penalty('blackhole');
         }
@@ -2680,6 +2723,21 @@ function checkSpecials(){
       const pull = 0.03 * scale * (1 - d / R);
       ball.vx += (cx - ball.x) / d * pull; ball.vy += (cy - ball.y) / d * pull;
       continue;
+    }
+    if (sp.kind === 'randoleporter'){
+      if (ball.padCd > 0 || ball.portalCd > 0 || d > 2.2 * (sp.scale || 1)) continue;
+      const pool0 = portals.concat(specials.filter(z => z.kind === 'randoleporter'));
+      let pool = pool0.filter(o => o !== sp && o !== ball.lastTeleportRef);
+      if (!pool.length) pool = pool0.filter(o => o !== sp);
+      if (!pool.length) continue;
+      const dest = pool[Math.floor(Math.random() * pool.length)];
+      const destCol = Number.isInteger(dest.color) ? PORTAL_COLORS[dest.color] : '#e0923b';
+      spawnBurst(ball.x, ball.y, 20, [destCol, '#fff', '#e0923b'], 1.4, 1.2, Math.round(2 * PORTAL_SCALE));
+      ball.x = dest.x + .5; ball.y = dest.y + .5; ball.padCd = 24; ball.portalCd = 24;
+      ball.lastTeleportRef = dest;
+      sfx.portal();
+      spawnBurst(ball.x, ball.y, 20, [destCol, '#fff', '#e0923b'], 1.4, 1.2, Math.round(2 * PORTAL_SCALE));
+      return;
     }
     if (ball.padCd > 0 || d > 2.4 * (sp.scale || 1)) continue;
     const speed = Math.hypot(ball.vx, ball.vy);
@@ -2727,6 +2785,40 @@ function drawOneSpecial(sp, t){
       rect(Math.round(x + .5 + Math.cos(a) * rr), Math.round(y + .5 + Math.sin(a) * rr), 1, 1, '#8a6bc0');
     }
     rect(x - 2, y - 2, 5, 5, '#120a20'); rect(x - 1, y - 1, 3, 3, '#000');
+  } else if (sp.kind === 'randoleporter'){
+    const cx2 = x + .5, cy2 = y + .5;
+    rect(cx2 - 2, cy2 + 2, 5, 1, 'rgba(0,0,0,.25)');
+    for (let ring = 3; ring >= 1; ring--){
+      const a = t * 2.8 * (ring % 2 === 0 ? 1 : -1) + ring;
+      for (let k = 0; k < 6; k++){
+        const ang = a + k * Math.PI / 3, rx = ring * 1.4 * s, ry = ring * 0.8 * s;
+        rect(Math.round(cx2 + Math.cos(ang) * rx), Math.round(cy2 + Math.sin(ang) * ry - ring * 0.3 * s), ring === 1 ? Math.max(1, Math.round(s)) : Math.max(1, Math.round(s)), ring === 1 ? Math.max(1, Math.round(s)) : Math.max(1, Math.round(s)), ring === 1 ? '#fff' : (k % 2 ? '#e0923b' : '#f8b863'));
+      }
+    }
+  } else if (sp.kind === 'bouncewall'){
+    const len = (sp.len || 10) * s, cx = x + .5, cy = y + .5;
+    rect(cx - Math.cos(rad) * len - 1, cy - Math.sin(rad) * len + 1, 3, 1, 'rgba(0,0,0,.2)');
+    for (let d2 = -len; d2 <= len; d2++){
+      const px = Math.round(cx + Math.cos(rad) * d2), py = Math.round(cy + Math.sin(rad) * d2);
+      rect(px - Math.round(Math.sin(rad)), py + Math.round(Math.cos(rad)), 1, 1, '#d8443a');
+      rect(px, py, 1, 1, '#f08070');
+    }
+    const ex = cx + Math.cos(rad) * len, ey = cy + Math.sin(rad) * len;
+    rect(Math.round(ex) - 1, Math.round(ey) - 1, 2, 2, '#fff');
+  } else if (sp.kind === 'checkpoint'){
+    ctx.save(); ctx.translate(x + .5, y + .5); ctx.scale(s, s);
+    rect(-3, 2, 7, 1, 'rgba(0,0,0,.2)');
+    rect(0, -7, 1, 7, '#d8d6cc');
+    const flap = 4 + Math.round(Math.sin(t * 3) * 1);
+    rect(1, -7, flap, 2, '#3fb06a'); rect(1, -5, flap - 1, 1, '#2f8f4e');
+    ctx.restore();
+  } else if (sp.kind === 'gravitater'){
+    const R = 16 * s;
+    ctx.globalAlpha = .12; ctx.strokeStyle = '#3a3a44';
+    for (let rr = R; rr > 3; rr -= 4){ ctx.beginPath(); ctx.arc(x + .5, y + .5, rr, 0, Math.PI * 2); ctx.stroke(); }
+    ctx.globalAlpha = 1;
+    rect(x - 4, y - 1, 9, 3, '#4a4a54'); rect(x - 4, y - 1, 9, 1, '#6a6a74');
+    for (let k = 0; k < 3; k++) rect(x - 2 + k * 2, y - 3 - (Math.sin(t * 4 + k) > 0 ? 1 : 0), 1, 2, '#2a2a30');
   }
 }
 function drawSpecials(t){ for (const sp of specials) drawOneSpecial(sp, t); }
@@ -2768,6 +2860,10 @@ function checkRails(){
       const pos = railPointAt(rail, segIdx, t); ball.x = pos.x; ball.y = pos.y;
       const tan = railTangent(rail, segIdx, dir);
       ball.vx = tan.x * speed; ball.vy = tan.y * speed;
+      // a rail only cares about void (falls off the course); water, trees, decorations and hazards never interrupt it
+      if (getT(ball.x, ball.y) === T.VOID || ball.x < 2 || ball.y < 2 || ball.x >= W - 2 || ball.y >= H - 2){
+        ball.onRail = null; penalty('oob');
+      }
     }
     return;
   }
@@ -2808,9 +2904,11 @@ function stepBall(){
     ball.vx += wind.dx * WIND_K * wind.mag; ball.vy += wind.dy * WIND_K * wind.mag;
     if (moveBall(Math.max(1, Math.ceil(Math.hypot(ball.vx, ball.vy))), true)) return;
     checkHazards();
+    if (ball.air && specials.length) checkAirSpecials();
     if (ball.air && ball.t >= ball.T) land();
     return;
   }
+  if (ball.onRail){ checkRails(); return; }
   const si = clamp(Math.floor(ball.y), 0, H-1)*W + clamp(Math.floor(ball.x), 0, W-1);
   ball.vx -= SLOPE_K * gxA[si]; ball.vy -= SLOPE_K * gyA[si];
   if (moveBall(Math.max(1, Math.ceil(Math.hypot(ball.vx, ball.vy))), false)) return;
@@ -3026,6 +3124,16 @@ function decoIconURL(i){
   try { ictx.clearRect(0, 0, 20, 24); drawDeco({ t:i, x:10, y:20 }, 0); } finally { ctx = prev; }
   return icv.toDataURL('image/png');
 }
+function specialIconURL(kind, color){
+  const prev = ctx; ctx = ictx;
+  try {
+    ictx.clearRect(0, 0, 20, 24);
+    if (kind === 'portal') drawOnePortal({ color:color || 0, x:10, y:14, scale:.85 }, 0, true);
+    else if (kind === 'rail'){ rect(2, 15, 16, 1, '#b8bac2'); rect(2, 16, 16, 1, '#7a7c84'); rect(5, 17, 2, 1, '#4a4c54'); rect(13, 17, 2, 1, '#4a4c54'); }
+    else drawOneSpecial({ kind, x:10, y:17, angle:0, scale:.9 }, 0);
+  } finally { ctx = prev; }
+  return icv.toDataURL('image/png');
+}
 DECOS.forEach((d, i) => {
   const b = el('button', { className:'btn terrain-btn' }); b.dataset.deco = i;
   b.append(el('img', { className:'deco-icon', src:decoIconURL(i), alt:'' }), document.createTextNode(d.name));
@@ -3035,16 +3143,30 @@ DECOS.forEach((d, i) => {
 const PORTAL_NAMES = ['Blue', 'Purple', 'Orange', 'Green'];
 PORTAL_COLORS.forEach((c, i) => {
   const b = el('button', { className:'btn terrain-btn' }); b.dataset.portal = i;
-  const chip = el('span', { className:'chip' }); chip.style.background = c; chip.style.borderRadius = '50%';
-  b.append(chip, document.createTextNode(PORTAL_NAMES[i] + ' portal'));
+  b.append(el('img', { className:'deco-icon', src:specialIconURL('portal', i), alt:'' }), document.createTextNode(PORTAL_NAMES[i] + ' portal'));
   b.onclick = () => { curPortalColor = i; curSpecialKind = 'portal'; editCat = 'special'; if (editMode !== 'build') editMode = 'build'; syncUI(); };
   $('portalColors').appendChild(b);
 });
-document.querySelectorAll('[data-special]').forEach(b => b.onclick = () => {
-  curSpecialKind = b.dataset.special; editCat = 'special';
-  if (curSpecialKind === 'rail'){ if (editMode !== 'build' && editMode !== 'remove') editMode = 'build'; }
-  else if (editMode !== 'build') editMode = 'build';
-  syncUI();
+const SPECIAL_DEFS = [
+  { kind:'speedpad', name:'Speed pad', title:"Redirects and boosts the ball to 1.75x speed, facing the way it's rotated" },
+  { kind:'jumppad', name:'Jump pad', title:'Launches the ball into the air at 1.5x speed, more if it was already fast' },
+  { kind:'blackhole', name:'Black hole', title:"Pulls the ball in. Fast enough and it slingshots around; too slow and it's swallowed for a penalty", wide:true },
+  { kind:'rail', name:'Rail (drag to draw)', title:'Drag to draw a track. The ball locks onto it and follows it', wide:true },
+  { kind:'randoleporter', name:'Randoleporter', title:'Teleports to a random other randoleporter on the hole', wide:true },
+  { kind:'bouncewall', name:'Bounce wall', title:"Bounces the ball off in the direction it's rotated. Shape makes it longer" },
+  { kind:'checkpoint', name:'Checkpoint', title:'Touching it moves your penalty respawn point forward' },
+  { kind:'gravitater', name:'Gravitater', title:'Slams a midair ball straight down and forces putter for the rest of the hole', wide:true },
+];
+SPECIAL_DEFS.forEach(d => {
+  const b = el('button', { className:'btn terrain-btn' + (d.wide ? ' span2' : ''), title:d.title }); b.dataset.special = d.kind;
+  b.append(el('img', { className:'deco-icon', src:specialIconURL(d.kind), alt:'' }), document.createTextNode(d.name));
+  b.onclick = () => {
+    curSpecialKind = d.kind; editCat = 'special';
+    if (d.kind === 'rail'){ if (editMode !== 'build' && editMode !== 'remove') editMode = 'build'; }
+    else if (editMode !== 'build') editMode = 'build';
+    syncUI();
+  };
+  $('otherSpecials').appendChild(b);
 });
 document.querySelectorAll('[data-tool]').forEach(b => b.onclick = () => { tool = tool === b.dataset.tool ? null : b.dataset.tool; syncUI(); });
 document.querySelectorAll('[data-haz]').forEach(b => b.onclick = () => { curHazKind = b.dataset.haz; editCat = 'hazards'; if (editMode !== 'build') editMode = 'build'; syncUI(); });
@@ -3093,16 +3215,25 @@ $('pubNewBtn').onclick = () => publishOnline(true);
 $('shareBtn').onclick = openShare;
 $('linkBtn').onclick = openCourseLink;
 $('inviteBtn').onclick = openInviteCoOwner;
-$('clubWoodBtn').onclick = () => {
-  if (allowedClubs.includes('driver')){ if (allowedClubs.length < 2){ toast('At least one club has to stay on'); return; } allowedClubs = allowedClubs.filter(c => c !== 'driver'); }
-  else allowedClubs = allowedClubs.concat('driver');
-  changed = true; syncUI();
-};
-$('clubPutterBtn').onclick = () => {
-  if (allowedClubs.includes('putter')){ if (allowedClubs.length < 2){ toast('At least one club has to stay on'); return; } allowedClubs = allowedClubs.filter(c => c !== 'putter'); }
-  else allowedClubs = allowedClubs.concat('putter');
-  changed = true; syncUI();
-};
+function toggleClub(id){
+  if (allowedClubs.includes(id)){
+    if (allowedClubs.length < 2){ toast('At least one club has to stay on'); return; }
+    allowedClubs = allowedClubs.filter(c => c !== id);
+    changed = true; syncUI();
+    const box = el('div');
+    box.appendChild(el('p', {}, (id === 'driver' ? 'Wood' : 'Putter') + " is off for players to pick manually. Should Auto mode also avoid it, or can Auto still use it when it makes sense?"));
+    modal('Disable for Auto too?', box, [
+      { label:'Also disable for Auto', cls:'primary', fn:() => { if (!autoExcluded.includes(id)) autoExcluded.push(id); changed = true; syncUI(); } },
+      { label:'Auto can still use it', fn:() => {} },
+    ]);
+  } else {
+    allowedClubs = allowedClubs.concat(id);
+    autoExcluded = autoExcluded.filter(c => c !== id);
+    changed = true; syncUI();
+  }
+}
+$('clubWoodBtn').onclick = () => toggleClub('driver');
+$('clubPutterBtn').onclick = () => toggleClub('putter');
 $('lockBtn').onclick = () => { courseLocked = !courseLocked; changed = true; syncUI(); };
 $('playBtn').onclick = () => { chainBounds = null; startPlay(); };
 $('tabEdit').onclick = () => { if (mode !== 'edit') stopPlay(); };
@@ -3204,9 +3335,9 @@ function syncUI(){
     build:'The usual tool: paint terrain or place whatever is picked in the tab below.',
     remove:'Click to remove. For terrain this erases with the brush below.',
   }[editMode] || '';
-  $('clubWoodBtn').textContent = 'Wood: ' + (allowedClubs.includes('driver') ? 'on' : 'off');
+  $('clubWoodBtn').textContent = 'Wood: ' + (allowedClubs.includes('driver') ? 'on' : autoExcluded.includes('driver') ? 'off (Auto too)' : 'off, Auto can still use it');
   $('clubWoodBtn').classList.toggle('on', allowedClubs.includes('driver'));
-  $('clubPutterBtn').textContent = 'Putter: ' + (allowedClubs.includes('putter') ? 'on' : 'off');
+  $('clubPutterBtn').textContent = 'Putter: ' + (allowedClubs.includes('putter') ? 'on' : autoExcluded.includes('putter') ? 'off (Auto too)' : 'off, Auto can still use it');
   $('clubPutterBtn').classList.toggle('on', allowedClubs.includes('putter'));
   $('lockBtn').textContent = courseLocked ? 'Locked — only you can edit it' : 'Unlocked — anyone can copy this';
   $('lockBtn').classList.toggle('on', courseLocked);
@@ -3215,8 +3346,9 @@ function syncUI(){
   $('inviteBtn').hidden = curCourse.source !== 'online';
   document.querySelectorAll('#terrains .btn').forEach(b => b.classList.toggle('on', +b.dataset.terrain === cur));
   document.querySelectorAll('#clubs .btn').forEach(b => {
-    b.classList.toggle('on', b.dataset.club === clubMode);
-    b.hidden = b.dataset.club !== 'auto' && !allowedClubs.includes(b.dataset.club);
+    b.classList.toggle('on', b.dataset.club === clubMode || (forcedPutter && b.dataset.club === 'putter'));
+    b.hidden = forcedPutter ? b.dataset.club !== 'putter' : (b.dataset.club !== 'auto' && !allowedClubs.includes(b.dataset.club));
+    b.disabled = forcedPutter && b.dataset.club !== 'putter';
   });
   $('sizeVal').textContent = brushSize + 'px'; $('size').value = brushSize;
   $('hstepVal').textContent = hstep; $('hstep').value = hstep;
@@ -3271,9 +3403,18 @@ window.addEventListener('keydown', e => {
     if ((e.ctrlKey || e.metaKey) && k === 'z'){ e.preventDefault(); e.shiftKey ? redo() : undo(); return; }
     if ((e.ctrlKey || e.metaKey) && k === 'y'){ e.preventDefault(); redo(); return; }
     if (e.ctrlKey || e.metaKey || e.altKey) return;
-    if (k === 'r' && selectedObj && (selectedObj.cat === 'hazard' || selectedObj.cat === 'special')){
-      if (!rotating){ pushUndo(); rotating = true; }
-      return;
+    if (k === 'r'){
+      let target = (selectedObj && (selectedObj.cat === 'hazard' || selectedObj.cat === 'special')) ? selectedObj : null;
+      if (!target && hover){
+        for (const c of ['hazard', 'special']){
+          const idx = findNearestGenerous(c, hover);
+          if (idx >= 0){ target = { cat:c, idx }; break; }
+        }
+      }
+      if (target){
+        if (!rotating){ pushUndo(); rotating = true; selectedObj = target; syncUI(); }
+        return;
+      }
     }
     if (k === 't') tool = tool === 'tee' ? null : 'tee'; else if (k === 'h') tool = tool === 'hole' ? null : 'hole';
     else if (k === '1'){ editMode = 'select'; tool = null; selectedObj = null; }

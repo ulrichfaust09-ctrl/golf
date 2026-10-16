@@ -415,7 +415,6 @@ const DECOS = [
   { name:'Fence',     solid:[-4,-1,4,0] },
   { name:'Parasol' },
 ];
-const MAX_PORTALS = 8;
 const PORTAL_COLORS = ['#3b8be0', '#a84bd6', '#e0923b', '#3fb06a'];
 const PORTAL_SCALE = 1.75;
 const MAX_HOLES = 18;
@@ -527,7 +526,6 @@ function setProp(o, key, val, sync){
     for (const other of pool){ if (other === o) continue; other.props = other.props || {}; other.props[key] = val; }
   }
 }
-const MAX_RAILS = 10, MAX_RAIL_PTS = 60;
 const JUMP_THRESHOLD = 2.0, BLACKHOLE_THRESHOLD = 2.2, BLACKHOLE_RADIUS = 20, BLACKHOLE_ORBIT_S = 2;
 let mode = 'edit', role = 'editor', screen = 'menu';
 let curCourse = { id:null, source:'new' };
@@ -1380,9 +1378,6 @@ function placePortal(p){
   if (t === T.VOID || t === T.WATER || t === T.MOUNTAIN || t === T.TREE){ toast('Place it on open land'); return; }
   if ([tee, hole].some(m => m && Math.hypot(m.x - x, m.y - y) < 10 * PORTAL_SCALE)){ toast('Too close to the tee or hole'); return; }
   if (portals.some(z => Math.hypot(z.x - x, z.y - y) < 8 * PORTAL_SCALE)){ toast('Too close to another portal'); return; }
-  const sameColor = portals.filter(z => z.color === curPortalColor);
-  if (sameColor.length >= 2){ toast('That color already has a pair. Remove one first.'); return; }
-  if (portals.length >= MAX_PORTALS){ toast('That is plenty of portals!'); return; }
   pushUndo();
   portals.push({ kind:'portal', color:curPortalColor, x, y, scale:1 });
 }
@@ -1411,7 +1406,6 @@ function removeSpecialAt(p){
 }
 /* ---- rails: drawn as a polyline, 2px wide ---- */
 function railStart(p){
-  if (rails.length >= MAX_RAILS){ toast('That is plenty of rails!'); return; }
   pushUndo();
   dragging = { rail:{ kind:'rail', points:[{ x:Math.round(p.x), y:Math.round(p.y) }] } };
 }
@@ -1420,7 +1414,6 @@ function railExtend(p){
   const pts = dragging.rail.points, last = pts[pts.length - 1];
   const x = Math.round(p.x), y = Math.round(p.y);
   if (Math.hypot(x - last.x, y - last.y) < 2.5) return;
-  if (pts.length >= MAX_RAIL_PTS) return;
   pts.push({ x, y });
   dirty = true;
 }
@@ -1674,16 +1667,16 @@ function parseHoles(o, cap = MAX_HOLES){
       });
     }
     const rls = [];
-    if (Array.isArray(hd.rl)) for (const r of hd.rl.slice(0, MAX_RAILS)){
+    if (Array.isArray(hd.rl)) for (const r of hd.rl){
       const rawPts = Array.isArray(r) ? r : (r && Array.isArray(r.pts) ? r.pts : null);
       if (!rawPts) continue;
-      const pts = rawPts.slice(0, MAX_RAIL_PTS).filter(pt => Array.isArray(pt) && Number.isFinite(pt[0]) && Number.isFinite(pt[1]))
+      const pts = rawPts.filter(pt => Array.isArray(pt) && Number.isFinite(pt[0]) && Number.isFinite(pt[1]))
         .map(pt => ({ x:clamp(pt[0]|0, 0, W-1), y:clamp(pt[1]|0, 0, H-1) }));
       const props = (r && typeof r.props === 'object' && !Array.isArray(r.props)) ? r.props : {};
       if (pts.length >= 2) rls.push({ kind:'rail', points:pts, props });
     }
     const ps = [];
-    if (Array.isArray(hd.pt)) for (const a of hd.pt.slice(0, MAX_PORTALS)){
+    if (Array.isArray(hd.pt)) for (const a of hd.pt){
       if (Array.isArray(a) && Number.isInteger(a[0]) && a[0] >= 0 && a[0] < PORTAL_COLORS.length && Number.isFinite(a[1]) && Number.isFinite(a[2])) ps.push({ kind:'portal', color:a[0], x:clamp(a[1]|0, 0, W-1), y:clamp(a[2]|0, 0, H-1), scale:clamp((Number(a[3]) || 20) / 20, 0.4, 4), props:(a[4] && typeof a[4] === 'object' && !Array.isArray(a[4])) ? a[4] : {} });
     }
     return { terrain:t, elev:e, decos:ds, hazards:zs, portals:ps, specials:sps, rails:rls, tee:ok(hd.tee), hole:ok(hd.hole), undo:[], redo:[] };
@@ -2741,13 +2734,25 @@ function applyTeleportExit(enterObj, exitObj, vx, vy){
   else angle = Math.random() * Math.PI * 2;
   return { vx:Math.cos(angle) * outSpeed, vy:Math.sin(angle) * outSpeed };
 }
+function portalPartnerMap(){
+  const waiting = new Map(), partners = new Map();
+  for (const portal of portals){
+    const first = waiting.get(portal.color);
+    if (first){
+      partners.set(first, portal); partners.set(portal, first);
+      waiting.delete(portal.color);
+    } else waiting.set(portal.color, portal);
+  }
+  return partners;
+}
 function checkPortals(){
   if (!portals.length) return;
   if (ball.portalCd > 0){ ball.portalCd--; return; }
+  const partners = portalPartnerMap();
   for (const p of portals){
     if (Math.hypot(ball.x - p.x - .5, ball.y - p.y - .5) > 2.1 * PORTAL_SCALE * (p.scale || 1)) continue;
     if (getProp(p, 'oneWay') && ball.lastTeleportRef === p) continue;
-    const partner = portals.find(q => q !== p && q.color === p.color);
+    const partner = partners.get(p);
     if (!partner) continue;
     spawnBurst(ball.x, ball.y, 14, [PORTAL_COLORS[p.color], '#fff'], 1.3, 1, Math.round(2 * PORTAL_SCALE));
     const out = applyTeleportExit(p, partner, ball.vx, ball.vy);
@@ -2773,7 +2778,8 @@ function drawOnePortal(p, t, paired){
   ctx.globalAlpha = 1;
 }
 function drawPortals(t){
-  for (const p of portals) drawOnePortal(p, t, portals.some(q => q !== p && q.color === p.color));
+  const partners = portalPartnerMap();
+  for (const p of portals) drawOnePortal(p, t, partners.has(p));
 }
 /* ---- speed pad / jump pad / black hole ---- */
 function stepBlackholeOrbit(){
@@ -3233,9 +3239,9 @@ cv.addEventListener('pointerdown', e => {
     return;
   }
   // decor / hazards / special
-  if (editCat === 'special' && curSpecialKind === 'rail'){
+  if (editCat === 'special' && curSpecialKind === 'rail' && (editMode === 'build' || editMode === 'remove')){
     if (editMode === 'build') railStart(p);
-    else if (editMode === 'remove') removeRailAt(p);
+    else removeRailAt(p);
     return;
   }
   if (editMode === 'build'){
@@ -3509,7 +3515,7 @@ function syncUI(){
     ? (editMode === 'build' ? 'Drag across the course to draw a track. The ball locks on and follows it.'
       : editMode === 'remove' ? 'Click near a rail to remove the whole thing.' : 'Rails only support Build and Remove.')
     : curSpecialKind === 'portal'
-      ? (editMode === 'build' ? 'Place two of the same color to link them — rolling into one sends the ball out the other.'
+      ? (editMode === 'build' ? 'Same-color portals link in pairs by placement order — rolling into one sends the ball out its partner.'
         : editMode === 'remove' ? 'Click a portal to remove it.' : editMode === 'move' ? 'Drag a portal to move it.'
         : editMode === 'select' ? 'Click a portal to select it.' : 'Pick Build to place one.')
       : (editMode === 'build' ? 'Click to place one. Use R (hold) in Select, Move or Shape mode to rotate it.'
@@ -3559,7 +3565,7 @@ function syncUI(){
               : 'Viewer mode: drag back from anywhere and let go to swing. Wind pushes shots in the air. Press Reviews to leave a comment.')
     : (tool === 'tee' || tool === 'hole')
       ? 'Click the course to place the ' + tool + '.'
-      : 'Keys: 1-5 switch mode, T tee, H hole, [ ] brush size, Ctrl+Z undo.';
+      : 'Keys: 1-5 mode, Q terrain, W decor, E hazards, Y terrain-lower, T tee, H hole, [ ] brush size, Ctrl+Z undo. Select/Shape + hold R rotates.';
   cv.style.cursor = edit ? 'crosshair' : 'grab';
   const heat = editCat === 'terrain' && editMode === 'build' && isHeightTool(terrainStyle) && edit;
   if (heat !== lastHeat){ lastHeat = heat; dirty = true; }
@@ -3609,6 +3615,10 @@ window.addEventListener('keydown', e => {
     else if (k === '3'){ editMode = editCat === 'terrain' ? editMode : 'shape'; tool = null; selectedObj = null; }
     else if (k === '4'){ editMode = 'build'; tool = null; selectedObj = null; }
     else if (k === '5'){ editMode = 'remove'; tool = null; selectedObj = null; }
+    else if (k === 'q'){ editCat = 'terrain'; tool = null; selectedObj = null; if (noMoveShape() && (editMode === 'move' || editMode === 'shape')) editMode = 'build'; }
+    else if (k === 'w'){ editCat = 'decor'; tool = null; selectedObj = null; }
+    else if (k === 'e'){ editCat = 'hazards'; tool = null; selectedObj = null; }
+    else if (k === 'y'){ editCat = 'terrain'; editMode = 'build'; terrainStyle = 'lower'; tool = null; selectedObj = null; }
     else if (k === '[') brushSize = Math.max(1, brushSize - 1);
     else if (k === ']') brushSize = Math.min(20, brushSize + 1);
     else return;

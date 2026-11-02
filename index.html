@@ -126,6 +126,11 @@ input[type=range]{width:100%;accent-color:var(--accent);margin:4px 0 0}
 .meter{height:16px;border:3px solid var(--line);background:var(--bg);margin-bottom:8px}
 .meter div{height:100%;width:0;background:var(--good)}
 
+/* ---------- editor toolbar ---------- */
+.editbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:16px}
+.editbar .seg{flex-wrap:wrap}
+details.panel summary{cursor:pointer;color:var(--muted);margin-bottom:10px;font-size:10px}
+details.panel[open] summary{margin-bottom:12px}
 /* ---------- modal + reviews ---------- */
 .overlay{
   position:fixed;inset:0;z-index:20;background:rgba(6,12,10,.6);display:flex;align-items:center;justify-content:center;
@@ -199,6 +204,31 @@ input[type=range]{width:100%;accent-color:var(--accent);margin:4px 0 0}
       <button class="btn sfx">Sound on</button>
     </div>
 
+        <div class="editbar" id="editBar">
+      <div class="seg" id="modeSeg">
+        <button class="btn sm" data-mode="select" title="Inspect things (1)">1 Select</button>
+        <button class="btn sm" data-mode="move" title="Move decor, hazards, specials (2)">2 Move</button>
+        <button class="btn sm" data-mode="shape" title="Resize, or drag on the canvas (3)">3 Shape</button>
+        <button class="btn sm" data-mode="build" title="Place or paint (4)">4 Build</button>
+        <button class="btn sm" data-mode="remove" title="Delete (5)">5 Remove</button>
+      </div>
+      <div class="seg">
+        <button class="btn sm" data-tool="tee" title="Place the tee spot (T)">Tee</button>
+        <button class="btn sm" data-tool="hole" title="Place the hole (H)">Hole</button>
+      </div>
+      <div class="seg" id="catTabs">
+        <button class="btn sm" data-cat="terrain" title="Q">Terrain</button>
+        <button class="btn sm" data-cat="decor" title="W">Decor</button>
+        <button class="btn sm" data-cat="hazards" title="E">Hazards</button>
+        <button class="btn sm" data-cat="special" title="Specials">Special</button>
+      </div>
+      <div class="seg" id="holeTabs"></div>
+      <div class="seg">
+        <button class="btn sm" id="addHoleBtn">+ Hole</button>
+        <button class="btn sm" id="delHoleBtn">- Hole</button>
+      </div>
+      <div class="status" id="status" style="margin:0;line-height:1.6"></div>
+    </div>
     <div class="layout">
       <main class="stage" id="stage">
         <div class="frame" id="frame">
@@ -212,51 +242,12 @@ input[type=range]{width:100%;accent-color:var(--accent);margin:4px 0 0}
       <aside>
         <!-- EDIT -->
         <div id="editPanel">
-          <button class="btn primary big" id="playBtn" style="margin-bottom:18px">Test play</button>
-
-          <div class="panel">
-            <h2>Holes</h2>
-            <div class="tabs" id="holeTabs" style="flex-wrap:wrap"></div>
-            <div class="grid2" style="margin-top:10px">
-              <button class="btn" id="addHoleBtn">+ Add hole</button>
-              <button class="btn" id="delHoleBtn">Delete hole</button>
-            </div>
-            <p class="note">A course can have up to 18 holes. "!" means a hole still needs a tee or a hole.</p>
-          </div>
-
-          <div class="panel">
-            <h2>Markers</h2>
-            <div class="grid2">
-              <button class="btn" data-tool="tee">Tee spot</button>
-              <button class="btn" data-tool="hole">Hole</button>
-            </div>
-            <div class="status" id="status"></div>
-          </div>
-
-          <div class="panel">
-            <h2>Mode</h2>
-            <div class="grid3">
-              <button class="btn sm" data-mode="select">1 Select</button>
-              <button class="btn sm" data-mode="move">2 Move</button>
-              <button class="btn sm" data-mode="shape">3 Shape</button>
-              <button class="btn sm" data-mode="build">4 Build</button>
-              <button class="btn sm" data-mode="remove">5 Remove</button>
-            </div>
-            <p class="note" id="modeNote"></p>
-          </div>
-
-          <div class="panel">
-            <div class="tabs" id="catTabs" style="flex-wrap:wrap">
-              <button class="btn" data-cat="terrain">Terrain</button>
-              <button class="btn" data-cat="decor">Decor</button>
-              <button class="btn" data-cat="hazards">Hazards</button>
-              <button class="btn" data-cat="special">Special</button>
-            </div>
-          </div>
-
-          <div class="panel" id="catPanel-terrain">
+          <button class="btn primary big" id="playBtn" style="margin-bottom:14px">Test play</button>
+          <p class="note" id="modeNote" style="margin:0 0 12px"></p>
+<div class="panel" id="catPanel-terrain">
             <h2>Terrain</h2>
             <div class="grid2" id="terrains"></div>
+            <div class="grid2" id="colorPick" style="margin-top:10px" hidden></div>
             <div class="grid3" id="terrainStyle" style="margin-top:10px">
               <button class="btn sm" data-tstyle="paint">Paint</button>
               <button class="btn sm" data-tstyle="fill">Fill</button>
@@ -315,7 +306,9 @@ input[type=range]{width:100%;accent-color:var(--accent);margin:4px 0 0}
             <div id="propsBody"></div>
           </div>
 
-          <div class="panel">
+                    <details class="panel" id="coursePanel">
+            <summary>Course, publishing &amp; clubs</summary>
+<div class="panel">
             <h2>Course</h2>
             <input class="text" id="nameIn" maxlength="20" aria-label="Course name">
             <div class="grid2">
@@ -341,9 +334,9 @@ input[type=range]{width:100%;accent-color:var(--accent);margin:4px 0 0}
             <button class="btn wide" id="lockBtn">Unlocked — anyone can copy this</button>
             <p class="note">Locking an online course lets people play it but not open it in the editor, so they can't copy your layout. Only matters once it's published.</p>
           </div>
+                  </details>
         </div>
 
-        <!-- PLAY -->
         <div id="playPanel" hidden>
           <div class="panel">
             <h2>Now playing</h2>
@@ -388,7 +381,7 @@ input[type=range]{width:100%;accent-color:var(--accent);margin:4px 0 0}
  *  CONSTANTS
  * ================================================================== */
 const W = 240, H = 150;
-const T = { ROUGH:0, FAIRWAY:1, GREEN:2, SAND:3, WATER:4, TREE:5, VOID:6, MOUNTAIN:7, ICE:8 };
+const T = { ROUGH:0, FAIRWAY:1, GREEN:2, SAND:3, WATER:4, TREE:5, VOID:6, MOUNTAIN:7, ICE:8, COLOR:9 };
 const TERRAINS = [
   { id:0, name:'Rough',   color:'#3a7a3c', desc:'Slows the ball down a lot. Shots land shorter.' },
   { id:1, name:'Fairway', color:'#6eb64f', desc:'Normal speed and roll. The default playing surface.' },
@@ -399,6 +392,7 @@ const TERRAINS = [
   { id:6, name:'Void (walls)', color:'#1a2622', desc:'Out of bounds. The edge of your land becomes a bouncy wall.' },
   { id:7, name:'Mountain', color:'#8c8a84', desc:'Automatically the highest ground. Blocks shots like a wall.' },
   { id:8, name:'Ice', color:'#bfe6f5', wide:true, desc:'Very little friction — the ball slides a long way.' },
+  { id:9, name:'Color', color:'#7fd1a0', wide:true, desc:'Acts like green. Pick a color, then paint with it.' },
 ];
 // solid = footprint [x0,y0,x1,y1] relative to the deco's base point
 const DECOS = [
@@ -415,14 +409,17 @@ const DECOS = [
   { name:'Fence',     solid:[-4,-1,4,0] },
   { name:'Parasol' },
 ];
+const MAX_DECOS = 500; // decode safety cap only, not a build limit
+const MAX_HAZARDS = 500; // decode safety cap only, not a build limit
+const MAX_PORTALS = 8;
 const PORTAL_COLORS = ['#3b8be0', '#a84bd6', '#e0923b', '#3fb06a'];
 const PORTAL_SCALE = 1.75;
 const MAX_HOLES = 18;
-const LIE_NAMES = ['Rough','Fairway','Green','Sand','Water','Trees','Void','Mountain','Ice'];
-const FRIC   = [0.935, 0.972, 0.978, 0.86, 0.9, 0.9, 0.9, 0.9, 0.99];
-const LAND   = [0.28, 0.42, 0.40, 0.03, 0, 0, 0, 0, 0.6];
-const LIE_PW = [0.85, 1, 1, 0.65, 1, 1, 1, 1, 1];
-const STATIC = [0.02, 0.014, 0.01, 0.045, 0, 0, 0, 0, 0.003];
+const LIE_NAMES = ['Rough','Fairway','Green','Sand','Water','Trees','Void','Mountain','Ice','Color'];
+const FRIC   = [0.935, 0.972, 0.978, 0.86, 0.9, 0.9, 0.9, 0.9, 0.99, 0.978];
+const LAND   = [0.28, 0.42, 0.40, 0.03, 0, 0, 0, 0, 0.6, 0.4];
+const LIE_PW = [0.85, 1, 1, 0.65, 1, 1, 1, 1, 1, 1];
+const STATIC = [0.02, 0.014, 0.01, 0.045, 0, 0, 0, 0, 0.003, 0.01];
 const TREE_H = 6, WALL_H = 5, DECO_H = 7, MOUNTAIN_H = 9;
 const SLOPE_K = 0.02;
 const HMAX = 60;
@@ -440,6 +437,12 @@ let ctx = cv.getContext('2d');
 const stage = $('stage');
 
 let terrain = new Uint8Array(W*H);
+let zoneGrid = new Uint16Array(W*H), zones = [];
+let colorGrid = new Uint8Array(W*H);
+let curColorIdx = 0;
+const COLOR_PALETTE = [[124,186,96],[220,70,60],[70,130,220],[240,200,70],[150,90,200],[240,140,50],[240,240,240],[230,110,170]];
+const COLOR_NAMES = ['Green','Red','Blue','Yellow','Purple','Orange','White','Pink'];
+const shade = (c, k) => [clamp(c[0]*k, 0, 255), clamp(c[1]*k, 0, 255), clamp(c[2]*k, 0, 255)];
 const elev = new Int8Array(W*H);
 let decos = [];
 let hazards = [];
@@ -472,7 +475,27 @@ const TELEPORT_PROPS = [
   { key:'oneWay', type:'bool', label:'One-way?', def:false },
   { key:'syncDir', type:'bool', label:'Sync ball direction?', def:false },
 ];
+const HAZ_PROPS = [
+  { key:'speedPct', type:'slider', min:25, max:300, step:5, def:100, label:'Speed %' },
+  { key:'knockback', type:'slider', min:25, max:300, step:5, def:100, label:'Knockback %' },
+  { key:'penalty', type:'bool', label:'Penalty on contact? (+1 stroke, ball goes back)', def:false },
+];
+const TEE_PROPS = [
+  { key:'size', type:'slider', min:50, max:200, step:5, def:100, label:'Ball size %' },
+  { key:'mass', type:'slider', min:50, max:200, step:5, def:100, label:'Weight % (heavier = shorter shots)' },
+];
+const ZONE_PROPS = [
+  { key:'loss', type:'slider', min:0, max:300, step:5, def:100, label:'Momentum loss %' },
+  { key:'instantStop', type:'bool', label:'Instant stop? (ball stops dead when it rolls in or lands here)', def:false },
+  { key:'bounce', type:'bool', label:'Bounce? (a landing ball hops again)', def:false },
+];
 const PROP_SCHEMAS = {
+  tee: TEE_PROPS,
+  zone: ZONE_PROPS,
+  spin: HAZ_PROPS,
+  slide: HAZ_PROPS,
+  pendulum: HAZ_PROPS.concat([{ key:'swing', type:'slider', min:20, max:170, step:5, def:60, label:'Swing arc (degrees)' }]),
+  popper: HAZ_PROPS.concat([{ key:'duty', type:'slider', min:10, max:90, step:5, def:40, label:'Time up (%)' }]),
   portal: TELEPORT_PROPS,
   randoleporter: TELEPORT_PROPS.concat([{ key:'allowRando', type:'bool', label:'Allow teleport to other randoleporters?', def:true }]),
   rail: [
@@ -522,10 +545,11 @@ function setProp(o, key, val, sync){
   o.props = o.props || {};
   o.props[key] = val;
   if (sync){
-    const pool = o.kind === 'rail' ? rails : specials.filter(z => z.kind === o.kind);
+    const pool = o.kind === 'rail' ? rails : HAZ_KINDS.includes(o.kind) ? hazards.filter(z => z.kind === o.kind) : specials.filter(z => z.kind === o.kind);
     for (const other of pool){ if (other === o) continue; other.props = other.props || {}; other.props[key] = val; }
   }
 }
+const MAX_SPECIALS = 500, MAX_RAILS = 200, MAX_RAIL_PTS = 60; // decode safety caps only, not build limits
 const JUMP_THRESHOLD = 2.0, BLACKHOLE_THRESHOLD = 2.2, BLACKHOLE_RADIUS = 20, BLACKHOLE_ORBIT_S = 2;
 let mode = 'edit', role = 'editor', screen = 'menu';
 let curCourse = { id:null, source:'new' };
@@ -597,13 +621,13 @@ const calcPar = () => parOf(tee, hole);
    above are always the currently checked-out hole; `holes[]` holds the rest. ---- */
 function blankHole(fill){
   const t = new Uint8Array(W*H); if (fill !== undefined) t.fill(fill);
-  return { terrain:t, elev:new Int8Array(W*H), decos:[], hazards:[], portals:[], specials:[], rails:[], tee:null, hole:null, undo:[], redo:[] };
+  return { terrain:t, elev:new Int8Array(W*H), decos:[], hazards:[], portals:[], specials:[], rails:[], zoneGrid:new Uint16Array(W*H), zones:[], colorGrid:new Uint8Array(W*H), tee:null, hole:null, undo:[], redo:[] };
 }
-function commitHole(){ holes[curHole] = { terrain, elev:elev.slice(), decos, hazards, portals, specials, rails, tee, hole, undo:undoStack, redo:redoStack }; }
+function commitHole(){ holes[curHole] = { terrain, elev:elev.slice(), decos, hazards, portals, specials, rails, colorGrid:colorGrid.slice(), zoneGrid:zoneGrid.slice(), zones:zones.map(z => ({ ...z, props:{ ...z.props } })), tee, hole, undo:undoStack, redo:redoStack }; }
 function loadHoleIntoActive(i){
   curHole = i;
   const h = holes[i];
-  terrain = h.terrain; elev.set(h.elev); decos = h.decos.map(d => ({...d})); hazards = (h.hazards || []).map(z => ({...z})); portals = (h.portals || []).map(p => ({...p})); specials = (h.specials || []).map(z => ({...z})); rails = (h.rails || []).map(r => ({ ...r, points:r.points.map(pt => ({...pt})) })); tee = h.tee; hole = h.hole;
+  terrain = h.terrain; elev.set(h.elev); decos = h.decos.map(d => ({...d})); hazards = (h.hazards || []).map(z => ({...z})); portals = (h.portals || []).map(p => ({...p})); specials = (h.specials || []).map(z => ({...z})); rails = (h.rails || []).map(r => ({ ...r, points:r.points.map(pt => ({...pt})) })); tee = h.tee; hole = h.hole; zoneGrid = h.zoneGrid ? h.zoneGrid.slice() : new Uint16Array(W*H); colorGrid = h.colorGrid ? h.colorGrid.slice() : new Uint8Array(W*H); zones = (h.zones || []).map(z => ({ ...z, props:{ ...z.props } })); selectedObj = null;
   undoStack = h.undo || []; redoStack = h.redo || [];
   rebuildSolids(); dirty = true;
 }
@@ -835,6 +859,11 @@ function buildBase(){
       const shore = n => n !== T.WATER && n !== T.TREE && n !== T.VOID && n !== T.MOUNTAIN;
       if (shore(nL) || shore(nR) || shore(nU) || shore(nD)) c = C.foam;
       else waterIdx.push(i);
+    } else if (t === T.COLOR){
+      const pc = COLOR_PALETTE[colorGrid[i]] || COLOR_PALETTE[0];
+      c = (((x + y) >> 2) & 1) ? pc : shade(pc, 0.92);
+      if (h < 18) c = shade(pc, 0.8); else if (h > 242) c = shade(pc, 1.12);
+      if (nL !== t || nR !== t || nU !== t || nD !== t) c = shade(pc, 0.62);
     } else if (t === T.ICE){
       c = ((x*2 + y) % 9 === 0 || h > 240) ? C.iceS : (h < 90 ? C.ice2 : C.ice1);
       if (nL !== t || nR !== t || nU !== t || nD !== t) c = C.iceE;
@@ -867,6 +896,7 @@ function buildBase(){
       if ((x < W-1 && Math.floor(hs[i+1] / 4) !== q) || (y < H-1 && Math.floor(hs[i+W] / 4) !== q)) f *= 1.09;
     }
     let r = c[0]*f, g2 = c[1]*f, b = c[2]*f;
+    if (zoneGrid[i]){ r = r*0.8 + 150*0.2; g2 = g2*0.8 + 90*0.2; b = b*0.8 + 220*0.2; }
     if (heat){
       const hv = hs[i], a = clamp(Math.abs(hv) / 24, 0, 0.55);
       if (hv > 0.4){ r += (255 - r)*a; g2 += (150 - g2)*a; b += (60 - b)*a; }
@@ -1061,7 +1091,7 @@ function currentClub(){
   if (forcedPutter) return 'putter';
   let c = clubMode;
   if (c === 'auto' || !allowedClubs.includes(c)){
-    c = getT(ball.x, ball.y) === T.GREEN ? 'putter' : 'driver';
+    c = (getT(ball.x, ball.y) === T.GREEN || getT(ball.x, ball.y) === T.COLOR) ? 'putter' : 'driver';
     if (autoExcluded.includes(c)) c = c === 'driver' ? 'putter' : 'driver';
   }
   if (!allowedClubs.includes(c) || autoExcluded.includes(c)) c = allowedClubs.find(x => !autoExcluded.includes(x)) || allowedClubs[0];
@@ -1152,10 +1182,10 @@ function drawAim(){
   const dx = ball.x - aim.x, dy = ball.y - aim.y, d = Math.hypot(dx, dy);
   if (d < 3) return;
   const p = Math.min(1, d / maxDrag()), ux = dx/d, uy = dy/d;
-  const club = currentClub(), lie = clamp(getT(ball.x, ball.y), 0, 8);
+  const club = currentClub(), lie = clamp(getT(ball.x, ball.y), 0, 9);
   let len;
-  if (club === 'driver') len = carryOf(p) * LIE_PW[lie];
-  else { const v = 0.35 + 2.05*p; len = Math.min(110, v / (1 - FRIC[lie]) * 0.9); }
+  if (club === 'driver') len = carryOf(p) * LIE_PW[lie] * massF();
+  else { const v = (0.35 + 2.05*p) * massF(); len = Math.min(110, v / (1 - FRIC[lie]) * 0.9); }
   ctx.fillStyle = `hsl(${Math.round(120 - 120*p)},85%,58%)`;
   for (let s = 5; s <= len; s += 4) ctx.fillRect(Math.floor(ball.x + ux*s), Math.floor(ball.y + uy*s), 2, 2);
   const ex = Math.floor(ball.x + ux*len), ey = Math.floor(ball.y + uy*len);
@@ -1253,8 +1283,8 @@ function render(now){
 /* ================================================================== *
  *  EDITING
  * ================================================================== */
-const snapshot = () => ({ t:terrain.slice(), e:elev.slice(), tee:tee && {...tee}, hole:hole && {...hole}, d:decos.map(d => ({...d})), z:hazards.map(z => ({...z})), p:portals.map(p => ({...p})), sp:specials.map(z => ({...z})), r:rails.map(r => ({ ...r, points:r.points.map(pt => ({...pt})) })) });
-function restoreSnap(s){ terrain = s.t.slice(); elev.set(s.e); tee = s.tee && {...s.tee}; hole = s.hole && {...s.hole}; decos = s.d.map(d => ({...d})); hazards = s.z.map(z => ({...z})); portals = s.p.map(p => ({...p})); specials = s.sp.map(z => ({...z})); rails = s.r.map(r => ({ ...r, points:r.points.map(pt => ({...pt})) })); rebuildSolids(); dirty = true; }
+const snapshot = () => ({ t:terrain.slice(), e:elev.slice(), tee:tee && {...tee}, hole:hole && {...hole}, d:decos.map(d => ({...d})), z:hazards.map(z => ({...z})), p:portals.map(p => ({...p})), sp:specials.map(z => ({...z})), r:rails.map(r => ({ ...r, points:r.points.map(pt => ({...pt})) })), zg:zoneGrid.slice(), cg:colorGrid.slice(), zn:zones.map(z => ({ ...z, props:{ ...z.props } })) });
+function restoreSnap(s){ terrain = s.t.slice(); elev.set(s.e); tee = s.tee && {...s.tee}; hole = s.hole && {...s.hole}; decos = s.d.map(d => ({...d})); hazards = s.z.map(z => ({...z})); portals = s.p.map(p => ({...p})); specials = s.sp.map(z => ({...z})); rails = s.r.map(r => ({ ...r, points:r.points.map(pt => ({...pt})) })); colorGrid = s.cg.slice(); zoneGrid = s.zg.slice(); zones = s.zn.map(z => ({ ...z, props:{ ...z.props } })); rebuildSolids(); dirty = true; }
 function pushUndo(){ undoStack.push(snapshot()); if (undoStack.length > 40) undoStack.shift(); redoStack.length = 0; changed = true; syncUI(); }
 function undo(){ if (!undoStack.length) return; redoStack.push(snapshot()); restoreSnap(undoStack.pop()); changed = true; syncUI(); }
 function redo(){ if (!redoStack.length) return; undoStack.push(snapshot()); restoreSnap(redoStack.pop()); changed = true; syncUI(); }
@@ -1264,6 +1294,7 @@ function paintPx(x, y, t){
   if ((t === T.WATER || t === T.TREE || t === T.VOID || t === T.MOUNTAIN) && nearMarker(x, y)) return;
   terrain[y*W + x] = t;
   if (t === T.MOUNTAIN) elev[y*W + x] = HMAX;
+  if (t === T.COLOR) colorGrid[y*W + x] = curColorIdx;
 }
 function stamp(cx, cy, t){
   const r = brushSize/2, rr = brushRR(), R = Math.ceil(r);
@@ -1306,6 +1337,7 @@ function floodFill(x0, y0, t){
     if ((t === T.WATER || t === T.TREE || t === T.VOID || t === T.MOUNTAIN) && nearMarker(x, y)) continue;
     terrain[i] = t;
     if (t === T.MOUNTAIN) elev[i] = HMAX;
+    if (t === T.COLOR) colorGrid[i] = curColorIdx;
     if (x > 0) stack.push(i-1);
     if (x < W-1) stack.push(i+1);
     if (y > 0) stack.push(i-W);
@@ -1331,7 +1363,7 @@ function clearAround(m){
 }
 function placeMarker(kind, p){
   const m = { x: clamp(Math.floor(p.x), 4, W-5), y: clamp(Math.floor(p.y), 12, H-5) };
-  if (kind === 'tee') tee = m; else hole = m;
+  if (kind === 'tee') tee = { ...m, kind:'tee', props:(tee && tee.props) || {} }; else hole = m;
   clearAround(m);
   syncUI();
 }
@@ -1378,6 +1410,9 @@ function placePortal(p){
   if (t === T.VOID || t === T.WATER || t === T.MOUNTAIN || t === T.TREE){ toast('Place it on open land'); return; }
   if ([tee, hole].some(m => m && Math.hypot(m.x - x, m.y - y) < 10 * PORTAL_SCALE)){ toast('Too close to the tee or hole'); return; }
   if (portals.some(z => Math.hypot(z.x - x, z.y - y) < 8 * PORTAL_SCALE)){ toast('Too close to another portal'); return; }
+  const sameColor = portals.filter(z => z.color === curPortalColor);
+  if (sameColor.length >= 2){ toast('That color already has a pair. Remove one first.'); return; }
+  if (portals.length >= MAX_PORTALS){ toast('That is plenty of portals!'); return; }
   pushUndo();
   portals.push({ kind:'portal', color:curPortalColor, x, y, scale:1 });
 }
@@ -1406,6 +1441,7 @@ function removeSpecialAt(p){
 }
 /* ---- rails: drawn as a polyline, 2px wide ---- */
 function railStart(p){
+  if (rails.length >= MAX_RAILS){ toast('That is plenty of rails!'); return; }
   pushUndo();
   dragging = { rail:{ kind:'rail', points:[{ x:Math.round(p.x), y:Math.round(p.y) }] } };
 }
@@ -1414,6 +1450,7 @@ function railExtend(p){
   const pts = dragging.rail.points, last = pts[pts.length - 1];
   const x = Math.round(p.x), y = Math.round(p.y);
   if (Math.hypot(x - last.x, y - last.y) < 2.5) return;
+  if (pts.length >= MAX_RAIL_PTS) return;
   pts.push({ x, y });
   dirty = true;
 }
@@ -1431,7 +1468,7 @@ function removeRailAt(p){
   pushUndo(); rails.splice(best, 1);
 }
 /* ---- Select / Move / Shape: shared across decor, hazards, special ---- */
-const catArr = cat => cat === 'deco' ? decos : cat === 'hazard' ? hazards : cat === 'portal' ? portals : cat === 'special' ? specials : cat === 'rail' ? rails : null;
+const catArr = cat => cat === 'deco' ? decos : cat === 'hazard' ? hazards : cat === 'portal' ? portals : cat === 'special' ? specials : cat === 'rail' ? rails : cat === 'zone' ? zones : cat === 'tee' ? (tee ? [tee] : []) : null;
 const catLabel = cat => cat === 'deco' ? 'decoration' : cat === 'hazard' ? 'hazard' : cat === 'special' ? 'special' : cat === 'rail' ? 'rail' : 'portal';
 function findNearest(cat, p, maxDist){
   const arr = catArr(cat); if (!arr) return -1;
@@ -1502,13 +1539,14 @@ function renderProps(){
   if (!o || !schema){ panel.hidden = true; return; }
   panel.hidden = false;
   const def = SPECIAL_DEFS.find(d => d.kind === kind);
-  $('propsInfo').textContent = 'Editing: ' + (def ? def.name : kind);
+  $('propsInfo').textContent = 'Editing: ' + (def ? def.name : ({spin:'Spinner',slide:'Slider',pendulum:'Pendulum',popper:'Popper',zone:'Terrain zone',tee:'Tee / ball'}[kind] || kind));
   body.innerHTML = '';
   schema.forEach(p => {
     const row = el('div', { style:'margin-bottom:12px' });
     const syncLbl = el('label', { style:'display:flex;align-items:center;gap:6px;margin-top:6px;font-size:8px;color:var(--muted)' });
     const syncCheck = el('input', { type:'checkbox' });
     syncLbl.append(syncCheck, document.createTextNode('Sync to similar objects?'));
+    syncLbl.hidden = kind === 'zone' || kind === 'tee';
     if (p.type === 'bool'){
       const val = !!getProp(o, p.key);
       const btn = el('button', { className:'btn wide' + (val ? ' on' : '') }, p.label + ' ' + (val ? 'Yes' : 'No'));
@@ -1629,12 +1667,18 @@ function serialize(){
     v:4, name:courseName, w:W, h:H, locked:courseLocked, clubs:allowedClubs, autoEx:autoExcluded,
     holes: holes.map(h => ({
       tee:h.tee, hole:h.hole, rle:rleEnc(h.terrain), erle:rleEnc(h.elev), decos:h.decos.map(d => [d.t, d.x, d.y, Math.round((d.scale || 1) * 20)]),
-      hz:(h.hazards || []).map(z => [HAZ_KINDS.indexOf(z.kind), z.x, z.y, Math.round(z.len), Math.round(z.period * 10), Math.round(z.phase * 100), Math.round(z.angle || 0)]),
+      hz:(h.hazards || []).map(z => [HAZ_KINDS.indexOf(z.kind), z.x, z.y, Math.round(z.len), Math.round(z.period * 10), Math.round(z.phase * 100), Math.round(z.angle || 0), z.props || {}]),
       pt:(h.portals || []).map(p => [p.color, p.x, p.y, Math.round((p.scale || 1) * 20), p.props || {}]),
       sp:(h.specials || []).map(z => [SPECIAL_KINDS.indexOf(z.kind), z.x, z.y, Math.round(z.angle || 0), Math.round((z.scale || 1) * 20), Math.round(z.len || 10), z.props || {}]),
       rl:(h.rails || []).map(r => ({ pts:r.points.map(pt => [pt.x, pt.y]), props:r.props || {} })),
+      zg:rleEnc(h.zoneGrid || new Uint16Array(W*H)), zones:(h.zones || []).map(z => ({ p:z.props || {} })), cg:rleEnc(h.colorGrid || new Uint8Array(W*H)),
     })),
   };
+}
+function okTee(m){
+  return (m && Number.isFinite(m.x) && Number.isFinite(m.y))
+    ? { kind:'tee', x:clamp(m.x|0, 0, W-1), y:clamp(m.y|0, 0, H-1), props:(m.props && typeof m.props === 'object' && !Array.isArray(m.props)) ? m.props : {} }
+    : null;
 }
 function parseHoles(o, cap = MAX_HOLES){
   if (!o || o.w !== W || o.h !== H) throw new Error('bad');
@@ -1643,22 +1687,22 @@ function parseHoles(o, cap = MAX_HOLES){
   const ok = m => m && Number.isFinite(m.x) && Number.isFinite(m.y) ? { x:clamp(m.x|0, 0, W-1), y:clamp(m.y|0, 0, H-1) } : null;
   return list.slice(0, cap).map(hd => {
     if (!Array.isArray(hd.rle)) throw new Error('bad');
-    const t = rleDec(hd.rle, Uint8Array, 0, 8);
+    const t = rleDec(hd.rle, Uint8Array, 0, 9);
     const e = Array.isArray(hd.erle) ? rleDec(hd.erle, Int8Array, -HMAX, HMAX) : new Int8Array(W*H);
     const ds = [];
-    if (Array.isArray(hd.decos)) for (const a of hd.decos){
+    if (Array.isArray(hd.decos)) for (const a of hd.decos.slice(0, MAX_DECOS)){
       if (Array.isArray(a) && Number.isInteger(a[0]) && a[0] >= 0 && a[0] < DECOS.length && Number.isFinite(a[1]) && Number.isFinite(a[2])) ds.push({ t:a[0], x:clamp(a[1]|0, 0, W-1), y:clamp(a[2]|0, 0, H-1), scale:clamp((Number(a[3]) || 20) / 20, 0.4, 4) });
     }
     const zs = [];
-    if (Array.isArray(hd.hz)) for (const a of hd.hz){
+    if (Array.isArray(hd.hz)) for (const a of hd.hz.slice(0, MAX_HAZARDS)){
       if (Array.isArray(a) && Number.isFinite(a[1]) && Number.isFinite(a[2])) zs.push({
         kind:HAZ_KINDS[a[0]] || 'slide', x:clamp(a[1]|0, 0, W-1), y:clamp(a[2]|0, 0, H-1),
         len:clamp(Number(a[3]) || 12, 4, 48), period:clamp((Number(a[4]) || 22) / 10, 0.6, 8),
-        phase:(Number(a[5]) || 0) / 100, angle:(a[6] === 1 ? 90 : Number.isFinite(a[6]) ? ((a[6] % 360) + 360) % 360 : 0),
+        phase:(Number(a[5]) || 0) / 100, angle:(a[6] === 1 ? 90 : Number.isFinite(a[6]) ? ((a[6] % 360) + 360) % 360 : 0), props:(a[7] && typeof a[7] === 'object' && !Array.isArray(a[7])) ? a[7] : {},
       });
     }
     const sps = [];
-    if (Array.isArray(hd.sp)) for (const a of hd.sp){
+    if (Array.isArray(hd.sp)) for (const a of hd.sp.slice(0, MAX_SPECIALS)){
       if (Array.isArray(a) && Number.isInteger(a[0]) && a[0] >= 0 && a[0] < SPECIAL_KINDS.length && Number.isFinite(a[1]) && Number.isFinite(a[2])) sps.push({
         kind:SPECIAL_KINDS[a[0]], x:clamp(a[1]|0, 0, W-1), y:clamp(a[2]|0, 0, H-1),
         angle:Number.isFinite(a[3]) ? ((a[3] % 360) + 360) % 360 : 0, scale:clamp((Number(a[4]) || 20) / 20, 0.4, 4),
@@ -1667,19 +1711,27 @@ function parseHoles(o, cap = MAX_HOLES){
       });
     }
     const rls = [];
-    if (Array.isArray(hd.rl)) for (const r of hd.rl){
+    if (Array.isArray(hd.rl)) for (const r of hd.rl.slice(0, MAX_RAILS)){
       const rawPts = Array.isArray(r) ? r : (r && Array.isArray(r.pts) ? r.pts : null);
       if (!rawPts) continue;
-      const pts = rawPts.filter(pt => Array.isArray(pt) && Number.isFinite(pt[0]) && Number.isFinite(pt[1]))
+      const pts = rawPts.slice(0, MAX_RAIL_PTS).filter(pt => Array.isArray(pt) && Number.isFinite(pt[0]) && Number.isFinite(pt[1]))
         .map(pt => ({ x:clamp(pt[0]|0, 0, W-1), y:clamp(pt[1]|0, 0, H-1) }));
       const props = (r && typeof r.props === 'object' && !Array.isArray(r.props)) ? r.props : {};
       if (pts.length >= 2) rls.push({ kind:'rail', points:pts, props });
     }
     const ps = [];
-    if (Array.isArray(hd.pt)) for (const a of hd.pt){
+    if (Array.isArray(hd.pt)) for (const a of hd.pt.slice(0, MAX_PORTALS)){
       if (Array.isArray(a) && Number.isInteger(a[0]) && a[0] >= 0 && a[0] < PORTAL_COLORS.length && Number.isFinite(a[1]) && Number.isFinite(a[2])) ps.push({ kind:'portal', color:a[0], x:clamp(a[1]|0, 0, W-1), y:clamp(a[2]|0, 0, H-1), scale:clamp((Number(a[3]) || 20) / 20, 0.4, 4), props:(a[4] && typeof a[4] === 'object' && !Array.isArray(a[4])) ? a[4] : {} });
     }
-    return { terrain:t, elev:e, decos:ds, hazards:zs, portals:ps, specials:sps, rails:rls, tee:ok(hd.tee), hole:ok(hd.hole), undo:[], redo:[] };
+    const zl = Array.isArray(hd.zones) ? hd.zones.slice(0, 2000).map(z => ({ kind:'zone', props:(z && z.p && typeof z.p === 'object' && !Array.isArray(z.p)) ? z.p : {} })) : [];
+    const zg = new Uint16Array(W*H);
+    if (Array.isArray(hd.zg)){
+      const dec = rleDec(hd.zg, Uint16Array, 0, 65535);
+      for (let i = 0; i < dec.length; i++){ const v = dec[i]; zg[i] = (v > 0 && v <= zl.length) ? v : 0; }
+    }
+    const cgArr = new Uint8Array(W*H);
+    if (Array.isArray(hd.cg)) cgArr.set(rleDec(hd.cg, Uint8Array, 0, 7));
+    return { terrain:t, elev:e, decos:ds, hazards:zs, portals:ps, specials:sps, rails:rls, zoneGrid:zg, zones:zl, colorGrid:cgArr, tee:okTee(hd.tee), hole:ok(hd.hole), undo:[], redo:[] };
   });
 }
 function applyData(o){
@@ -2562,7 +2614,7 @@ function stepSwing(){
 }
 function launchShot(ux, uy, p){
   golferPos = { x:Math.floor(ball.x - swing.f * 5), y:Math.floor(ball.y + 1), f:swing.f };
-  const club = currentClub(), lie = clamp(getT(ball.x, ball.y), 0, 8);
+  const club = currentClub(), lie = clamp(getT(ball.x, ball.y), 0, 9);
   ball.lx = ball.x; ball.ly = ball.y; strokes++;
   if (club === 'driver' && !woodGrounded){
     const c = carryOf(p) * LIE_PW[lie], Tt = Math.round(18 + 22*p), v = c / Tt;
@@ -2574,6 +2626,7 @@ function launchShot(ux, uy, p){
     const v = 0.35 + 2.05*p;
     ball.vx = ux*v; ball.vy = uy*v; ball.air = false;
   }
+  ball.vx *= massF(); ball.vy *= massF();
   ball.moving = true; sfx.hit();
 }
 function penalty(kind, n){
@@ -2582,6 +2635,8 @@ function penalty(kind, n){
     startReact('sulk');
     const a = achState(); a.splash = (a.splash || 0) + 1; lsSet(K_ACH, a); if (a.splash >= 5) unlock('splash');
     spawnBurst(ball.x, ball.y, 26, ['#b9dcff', '#fff', '#5a9be0'], 1.6, 1.5); sfx.splash(); toast('Splash! +1 stroke');
+  } else if (kind === 'hazard'){
+    spawnBurst(ball.x, ball.y, 14, ['#e0c086', '#a87c4e'], 1.2, 1); sfx.oob(); toast('Hit by a hazard! +1 stroke');
   } else if (kind === 'blackhole'){
     startReact('sulk');
     spawnBurst(ball.x, ball.y, 50, ['#3a2a52', '#1a1030', '#6a4ba0', '#8a6bc0'], 1.8, 1.4, 2); beep(140, .4, 'sine', .04, -100); toast('Swallowed by the black hole! +1 stroke');
@@ -2597,7 +2652,7 @@ function stopBall(){
 }
 function settle(){
   if (Math.hypot(ball.vx, ball.vy) >= .06) return;
-  const t = clamp(getT(ball.x, ball.y), 0, 8);
+  const t = clamp(getT(ball.x, ball.y), 0, 9);
   if (slopeMagAt(ball.x, ball.y) < STATIC[t]) stopBall();
 }
 
@@ -2626,7 +2681,7 @@ function moveBall(n, air){
     if (!air){
       if (getT(nx, ny) === T.WATER){ penalty('water'); return true; }
       const d = Math.hypot(nx - (hole.x + .5), ny - (hole.y + .5)), sp = Math.hypot(ball.vx, ball.vy);
-      if (d < 2.6 && sp < SINK_MAX_SPEED){
+      if (d < 2.6 * ballSizeF() && sp < SINK_MAX_SPEED){
         ball.sink = 1; ball.moving = false; ball.vx = ball.vy = 0; sfx.cup();
         if (strokes === 1) startReact('ace');
         spawnBurst(hole.x + .5, hole.y - 4, 34, ['#ffd23f', '#e8443a', '#fff', '#3fb0ff', '#7be07b'], 2.2, 2.4, 2);
@@ -2646,6 +2701,14 @@ function land(){
   if (tt === T.VOID || tt === T.MOUNTAIN || tt < 0 || ball.x < 2 || ball.y < 2 || ball.x >= W-2 || ball.y >= H-2){ penalty('oob'); return; }
   const k = LAND[tt] || 0;
   ball.vx *= k; ball.vy *= k;
+  const zl = zoneAt(ball.x, ball.y);
+  if (zl && getProp(zl, 'instantStop')){ stopBall(); sfx.bounce(); return; }
+  if (zl && getProp(zl, 'bounce') && Math.hypot(ball.vx, ball.vy) > 0.25){
+    ball.air = true; ball.t = 0; ball.T = 14; ball.H = Math.max(3, ball.H * 0.35);
+    ball.vx *= 0.85; ball.vy *= 0.85; sfx.bounce();
+    spawnBurst(ball.x, ball.y, 6, ['#e8d08e', '#fff'], .9, .6);
+    return;
+  }
   if (tt === T.SAND){ spawnBurst(ball.x, ball.y, 12, ['#e8d08e', '#d4b874', '#f4e4ae'], 1.1, .8); startReact('sand'); }
   else if (tt === T.ICE) spawnBurst(ball.x, ball.y, 8, ['#f4fbff', '#bfe6f5'], 1, .6);
   else spawnBurst(ball.x, ball.y, 5, ['#5aa04c', '#3a7a3c'], .7, .5);
@@ -2653,36 +2716,40 @@ function land(){
   settle();
 }
 let simTime = 0;
+function hazPeriod(hz){ return hz.period / (getProp(hz, 'speedPct') / 100); }
 function hazardCircles(t){
   const out = [];
   for (const hz of hazards){
     if (hz.kind === 'slide'){
-      const off = Math.sin((t / hz.period) * Math.PI * 2 + hz.phase) * hz.len, ar = (hz.angle || 0) * Math.PI / 180;
+      const off = Math.sin((t / hazPeriod(hz)) * Math.PI * 2 + hz.phase) * hz.len, ar = (hz.angle || 0) * Math.PI / 180;
       out.push({ x:hz.x + Math.cos(ar) * off, y:hz.y + Math.sin(ar) * off, r:2.6, hz, off });
     } else if (hz.kind === 'spin'){
-      const a = (t / hz.period) * Math.PI * 2 + hz.phase;
+      const a = (t / hazPeriod(hz)) * Math.PI * 2 + hz.phase;
       out.push({ x:hz.x + Math.cos(a) * hz.len, y:hz.y + Math.sin(a) * hz.len, r:1.7, hz, a });
       out.push({ x:hz.x - Math.cos(a) * hz.len, y:hz.y - Math.sin(a) * hz.len, r:1.7, hz, a: a + Math.PI });
     } else if (hz.kind === 'pendulum'){
       const base = Math.PI / 2 + (hz.angle || 0) * Math.PI / 180;
-      const a = base + Math.sin((t / hz.period) * Math.PI * 2 + hz.phase) * 1.05;
+      const a = base + Math.sin((t / hazPeriod(hz)) * Math.PI * 2 + hz.phase) * (getProp(hz, 'swing') * Math.PI / 180);
       out.push({ x:hz.x + Math.cos(a) * hz.len, y:hz.y + Math.sin(a) * hz.len, r:1.9, hz, a });
     } else if (hz.kind === 'popper'){
-      const u = (Math.sin((t / hz.period) * Math.PI * 2 + hz.phase) + 1) / 2;
-      if (u > 0.6) out.push({ x:hz.x, y:hz.y, r:2.2, hz, u });
+      const u = (Math.sin((t / hazPeriod(hz)) * Math.PI * 2 + hz.phase) + 1) / 2;
+      if (u > 1 - getProp(hz, 'duty') / 100) out.push({ x:hz.x, y:hz.y, r:2.2, hz, u });
     }
   }
   return out;
 }
 function checkHazards(){
   if (!hazards.length) return;
+  for (const z of hazards) if (z._cd > 0) z._cd--;
   for (const c of hazardCircles(simTime)){
     const dx = ball.x - c.x, dy = ball.y - c.y, d = Math.hypot(dx, dy), rr = c.r + 1.1;
     if (d < rr){
       const nx = d > 0.001 ? dx / d : 1, ny = d > 0.001 ? dy / d : 0;
       const dot = ball.vx * nx + ball.vy * ny, e = 0.85;
       if (dot < 0){ ball.vx -= (1 + e) * dot * nx; ball.vy -= (1 + e) * dot * ny; }
-      ball.vx += nx * 0.5; ball.vy += ny * 0.5;
+      const kb = getProp(c.hz, 'knockback') / 100;
+      ball.vx += nx * 0.5 * kb; ball.vy += ny * 0.5 * kb;
+      if (getProp(c.hz, 'penalty') && !(c.hz._cd > 0)){ c.hz._cd = 40; penalty('hazard', 1); return; }
       ball.x = c.x + nx * rr; ball.y = c.y + ny * rr; ball.air = false; ball.z = 0;
       sfx.bounce(); spawnBurst(ball.x, ball.y, 5, ['#e0c086', '#a87c4e', '#8a5a34'], .9, .5);
     }
@@ -2690,7 +2757,7 @@ function checkHazards(){
 }
 function drawOneHazard(hz, t){
   if (hz.kind === 'slide'){
-    const off = Math.sin((t / hz.period) * Math.PI * 2 + hz.phase) * hz.len, ar = (hz.angle || 0) * Math.PI / 180;
+    const off = Math.sin((t / hazPeriod(hz)) * Math.PI * 2 + hz.phase) * hz.len, ar = (hz.angle || 0) * Math.PI / 180;
     const cx = hz.x + Math.cos(ar) * off, cy = hz.y + Math.sin(ar) * off;
     ctx.save(); ctx.translate(cx, cy); ctx.rotate(ar);
     rect(-3, 2, 7, 1, 'rgba(0,0,0,.28)');
@@ -2698,7 +2765,7 @@ function drawOneHazard(hz, t){
     rect(-2, -1, 5, 1, '#c48a4c');
     ctx.restore();
   } else if (hz.kind === 'spin'){
-    const a = (t / hz.period) * Math.PI * 2 + hz.phase;
+    const a = (t / hazPeriod(hz)) * Math.PI * 2 + hz.phase;
     rect(hz.x - 1, hz.y - 1, 3, 3, 'rgba(0,0,0,.22)');
     for (const sign of [1, -1]){
       const ex = hz.x + Math.cos(a) * hz.len * sign, ey = hz.y + Math.sin(a) * hz.len * sign;
@@ -2708,14 +2775,14 @@ function drawOneHazard(hz, t){
     rect(hz.x - 1, hz.y - 1, 2, 2, '#3a2a20');
   } else if (hz.kind === 'pendulum'){
     const base = Math.PI / 2 + (hz.angle || 0) * Math.PI / 180;
-    const a = base + Math.sin((t / hz.period) * Math.PI * 2 + hz.phase) * 1.05;
+    const a = base + Math.sin((t / hazPeriod(hz)) * Math.PI * 2 + hz.phase) * (getProp(hz, 'swing') * Math.PI / 180);
     const ex = hz.x + Math.cos(a) * hz.len, ey = hz.y + Math.sin(a) * hz.len;
     rect(Math.round(ex) - 1, hz.y + hz.len + 1, 3, 1, 'rgba(0,0,0,.2)');
     rect(hz.x - 2, hz.y - 2, 5, 2, '#5e3a20'); rect(hz.x - 1, hz.y - 1, 3, 1, '#3a2a20');
     for (let sp = 2; sp <= hz.len; sp += 3) rect(Math.round(hz.x + Math.cos(a) * sp), Math.round(hz.y + Math.sin(a) * sp), 1, 1, '#c8c8ce');
     rect(Math.round(ex) - 2, Math.round(ey) - 2, 4, 4, '#8a3b2a'); rect(Math.round(ex) - 1, Math.round(ey) - 2, 2, 1, '#c85a3f');
   } else if (hz.kind === 'popper'){
-    const u = (Math.sin((t / hz.period) * Math.PI * 2 + hz.phase) + 1) / 2, up = u > 0.6;
+    const u = (Math.sin((t / hazPeriod(hz)) * Math.PI * 2 + hz.phase) + 1) / 2, up = u > 1 - getProp(hz, 'duty') / 100;
     rect(hz.x - 3, hz.y, 7, 2, 'rgba(0,0,0,.25)');
     rect(hz.x - 3, hz.y - 1, 7, 2, '#7a5a3a'); rect(hz.x - 3, hz.y - 1, 7, 1, '#9a7850');
     const h = Math.round(2 + u * 7);
@@ -2734,25 +2801,13 @@ function applyTeleportExit(enterObj, exitObj, vx, vy){
   else angle = Math.random() * Math.PI * 2;
   return { vx:Math.cos(angle) * outSpeed, vy:Math.sin(angle) * outSpeed };
 }
-function portalPartnerMap(){
-  const waiting = new Map(), partners = new Map();
-  for (const portal of portals){
-    const first = waiting.get(portal.color);
-    if (first){
-      partners.set(first, portal); partners.set(portal, first);
-      waiting.delete(portal.color);
-    } else waiting.set(portal.color, portal);
-  }
-  return partners;
-}
 function checkPortals(){
   if (!portals.length) return;
   if (ball.portalCd > 0){ ball.portalCd--; return; }
-  const partners = portalPartnerMap();
   for (const p of portals){
     if (Math.hypot(ball.x - p.x - .5, ball.y - p.y - .5) > 2.1 * PORTAL_SCALE * (p.scale || 1)) continue;
     if (getProp(p, 'oneWay') && ball.lastTeleportRef === p) continue;
-    const partner = partners.get(p);
+    const partner = portals.find(q => q !== p && q.color === p.color);
     if (!partner) continue;
     spawnBurst(ball.x, ball.y, 14, [PORTAL_COLORS[p.color], '#fff'], 1.3, 1, Math.round(2 * PORTAL_SCALE));
     const out = applyTeleportExit(p, partner, ball.vx, ball.vy);
@@ -2778,8 +2833,7 @@ function drawOnePortal(p, t, paired){
   ctx.globalAlpha = 1;
 }
 function drawPortals(t){
-  const partners = portalPartnerMap();
-  for (const p of portals) drawOnePortal(p, t, partners.has(p));
+  for (const p of portals) drawOnePortal(p, t, portals.some(q => q !== p && q.color === p.color));
 }
 /* ---- speed pad / jump pad / black hole ---- */
 function stepBlackholeOrbit(){
@@ -3085,6 +3139,40 @@ function drawRails(){
     }
   }
 }
+/* ---- terrain zones + ball props ---- */
+function zoneAt(x, y){ x = Math.floor(x); y = Math.floor(y); if (!inb(x, y)) return null; const id = zoneGrid[y*W + x]; return id ? (zones[id-1] || null) : null; }
+function zoneFric(){
+  const base = FRIC[clamp(getT(ball.x, ball.y), 0, 9)], z = zoneAt(ball.x, ball.y);
+  if (!z) return base;
+  return clamp(1 - (1 - base) * (getProp(z, 'loss') / 100), 0, 1);
+}
+const ballProp = k => getProp(tee && tee.kind === 'tee' ? tee : { kind:'tee' }, k);
+const massF = () => 100 / ballProp('mass');
+const ballSizeF = () => ballProp('size') / 100;
+function trySelectMarker(p){
+  if (tee && Math.hypot(tee.x - p.x, tee.y - p.y) < 8){ selectedObj = { cat:'tee', idx:0 }; syncUI(); return true; }
+  return false;
+}
+function selectZoneAt(c){
+  const i0 = c.y * W + c.x, t0 = terrain[i0];
+  if (zoneGrid[i0]){ selectedObj = { cat:'zone', idx:zoneGrid[i0] - 1 }; syncUI(); return; }
+  pushUndo();
+  zones.push({ kind:'zone', props:{} });
+  const id = zones.length, stack = [i0];
+  let n = 0;
+  while (stack.length){
+    const i = stack.pop();
+    if (zoneGrid[i] || terrain[i] !== t0) continue;
+    zoneGrid[i] = id; n++;
+    const x = i % W, y = (i / W) | 0;
+    if (x > 0) stack.push(i - 1); if (x < W - 1) stack.push(i + 1);
+    if (y > 0) stack.push(i - W); if (y < H - 1) stack.push(i + W);
+  }
+  dirty = true;
+  selectedObj = { cat:'zone', idx:id - 1 };
+  toast((TERRAINS.find(x => x.id === t0) || { name:'Terrain' }).name + ' zone: ' + n + ' cells');
+  syncUI();
+}
 function stepBall(){
   if (ball.holed) return;
   if (ball.sink > 0){ ball.sink++; if (ball.sink > 36 && !react) onHoleDone(); return; }
@@ -3107,9 +3195,9 @@ function stepBall(){
   if (moveBall(Math.max(1, Math.ceil(Math.hypot(ball.vx, ball.vy))), false)) return;
   checkHazards(); checkPortals(); checkRails(); checkSpecials();
   if (ball.blackhole || !ball.moving || ball.onRail) return;
-  const f = FRIC[clamp(getT(ball.x, ball.y), 0, 8)];
+  const f = zoneFric(), zn = zoneAt(ball.x, ball.y);
   ball.vx *= f; ball.vy *= f;
-  settle();
+  if (zn && getProp(zn, 'instantStop')) stopBall(); else settle();
 }
 function scoreName(s, par){
   if (s === 1) return 'Hole in one!';
@@ -3221,6 +3309,7 @@ cv.addEventListener('pointerdown', e => {
   if (tool === 'tee' || tool === 'hole'){
     pushUndo(); dragging = { marker:tool }; placeMarker(tool, c); return;
   }
+  if (editMode === 'select' && trySelectMarker(p)) return;
   if (editCat === 'terrain'){
     if (editMode === 'build'){
       if (terrainStyle === 'paint'){ pushUndo(); dragging = { erase:false }; lastPt = c; stamp(c.x, c.y, cur); }
@@ -3234,7 +3323,7 @@ cv.addEventListener('pointerdown', e => {
       pushUndo(); dragging = { erase:true }; lastPt = c; stamp(c.x, c.y, T.VOID);
     } else if (editMode === 'select'){
       const t = terrain[c.y * W + c.x];
-      toast((TERRAINS.find(x => x.id === t) || { name:'Nothing' }).name);
+      selectZoneAt(c);
     }
     return;
   }
@@ -3377,6 +3466,13 @@ document.querySelectorAll('[data-cat]').forEach(b => b.onclick = () => {
   syncUI();
 });
 document.querySelectorAll('[data-tstyle]').forEach(b => b.onclick = () => { terrainStyle = b.dataset.tstyle; syncUI(); });
+COLOR_PALETTE.forEach((c, i) => {
+  const b = el('button', { className:'btn terrain-btn' }); b.dataset.color = i;
+  const chip = el('span', { className:'chip' }); chip.style.background = 'rgb(' + c.join(',') + ')';
+  b.append(chip, document.createTextNode(COLOR_NAMES[i]));
+  b.onclick = () => { curColorIdx = i; cur = 9; editCat = 'terrain'; if (editMode !== 'build') editMode = 'build'; syncUI(); };
+  $('colorPick').appendChild(b);
+});
 $('shapeSlider').oninput = e => {
   if (!selectedObj) return;
   const v = +e.target.value / 100;
@@ -3464,6 +3560,7 @@ function renderHoleTabs(){
 function syncUI(){
   const editor = role === 'editor', edit = mode === 'edit' && editor;
   $('editPanel').hidden = !edit; $('playPanel').hidden = edit;
+  $('editBar').hidden = !edit;
   $('roleSeg').hidden = curCourse.source === 'chain';
   renderHoleTabs();
   $('playersBtn').textContent = 'Players (' + players.length + ')';
@@ -3489,6 +3586,8 @@ function syncUI(){
 
   });
   document.querySelectorAll('[data-tstyle]').forEach(b => b.classList.toggle('on', b.dataset.tstyle === terrainStyle));
+  $('colorPick').hidden = !(editCat === 'terrain' && cur === 9);
+  document.querySelectorAll('[data-color]').forEach(b => b.classList.toggle('on', +b.dataset.color === curColorIdx));
   ['terrain', 'decor', 'hazards', 'special'].forEach(c => { $('catPanel-' + c).hidden = editCat !== c; });
   $('heightExtra').hidden = !(editCat === 'terrain' && editMode === 'build' && isHeightTool(terrainStyle));
   $('shapePanel').hidden = editMode !== 'shape';
@@ -3515,14 +3614,14 @@ function syncUI(){
     ? (editMode === 'build' ? 'Drag across the course to draw a track. The ball locks on and follows it.'
       : editMode === 'remove' ? 'Click near a rail to remove the whole thing.' : 'Rails only support Build and Remove.')
     : curSpecialKind === 'portal'
-      ? (editMode === 'build' ? 'Same-color portals link in pairs by placement order — rolling into one sends the ball out its partner.'
+      ? (editMode === 'build' ? 'Place two of the same color to link them — rolling into one sends the ball out the other.'
         : editMode === 'remove' ? 'Click a portal to remove it.' : editMode === 'move' ? 'Drag a portal to move it.'
         : editMode === 'select' ? 'Click a portal to select it.' : 'Pick Build to place one.')
       : (editMode === 'build' ? 'Click to place one. Use R (hold) in Select, Move or Shape mode to rotate it.'
         : editMode === 'remove' ? 'Click to remove it.' : editMode === 'move' ? 'Drag to move it.'
         : editMode === 'select' ? 'Click to select it, then hold R to rotate.' : 'Pick Build to place one.');
   $('modeNote').textContent = {
-    select:'Click something to see what it is. Selecting a hazard or special also lets you hold R to rotate it.',
+    select:'Click a tee, a terrain patch (selects every connected cell of that terrain), a hazard or a special to inspect it. Hold R to rotate hazards and specials.',
     move:'Drag a decoration, hazard or portal to reposition it.',
     shape:'Click something, then use the slider (or drag on the canvas) to resize it. Hold R to rotate a selected hazard or special.',
     build:'The usual tool: paint terrain or place whatever is picked in the tab below.',

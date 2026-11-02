@@ -126,6 +126,9 @@ input[type=range]{width:100%;accent-color:var(--accent);margin:4px 0 0}
 .meter{height:16px;border:3px solid var(--line);background:var(--bg);margin-bottom:8px}
 .meter div{height:100%;width:0;background:var(--good)}
 
+/* ---------- fun ---------- */
+.confetti{position:fixed;top:-16px;width:8px;height:12px;z-index:60;pointer-events:none;animation-name:confFall;animation-timing-function:linear;animation-fill-mode:forwards}
+@keyframes confFall{to{transform:translateY(110vh) rotate(720deg)}}
 /* ---------- controls console ---------- */
 #console{position:fixed;left:0;right:0;bottom:0;z-index:40;background:var(--panel);border-top:4px solid var(--line);padding:10px 16px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
 #console[hidden]{display:none!important}
@@ -1936,21 +1939,27 @@ const parseDuration = str => {
   return ms > 0 && ms <= 30 * 86400000 ? ms : 0;
 };
 function parseChatCmd(line){
-  const m = line.match(/^\/chat\s+@?(\S+?)(?:\s+mode\s+"([a-z]+)")?\s*(?:\(([^)]*)\))?\s*:\s*(.+)$/i);
+  const m = line.match(/^\/chat\s+@?(\S+?)(?:\s+mode\s+(.*?))?\s*(?:\(([^)]*)\))?\s*:\s*(.+)$/i);
   if (!m) return { err:'Try: /chat name mode "normal": hello' };
-  const to = m[1].toLowerCase(), mode = (m[2] || 'normal').toLowerCase(), text = m[4].trim();
-  if (!MAIL_MODES.includes(mode)) return { err:'Modes: normal, pigeon, temporary, urgent' };
+  const to = m[1].toLowerCase(), text = m[4].trim();
+  const modeList = m[2] == null ? ['normal'] : [...m[2].matchAll(/"([a-z]+)"/gi)].map(x => x[1].toLowerCase());
+  if (!modeList.length) return { err:'Put each mode in quotes, like mode "urgent" or mode "normal" and "urgent"' };
+  const bad = modeList.find(x => !MAIL_MODES.includes(x));
+  if (bad) return { err:'Unknown mode "' + bad + '". Modes: normal, pigeon, temporary, urgent' };
+  const urgent = modeList.includes('urgent'), pigeon = modeList.includes('pigeon'), temporary = modeList.includes('temporary');
   let durMs = 0;
-  if (mode === 'temporary'){
+  if (temporary){
     durMs = parseDuration(m[3]);
     if (!durMs) return { err:'temporary needs a time, like (30 seconds) or (2 hours)' };
   }
-  return { to, mode, durMs, text };
+  const mode = urgent ? 'urgent' : pigeon ? 'pigeon' : temporary ? 'temporary' : 'normal';
+  return { to, mode, urgent, pigeon, temporary, durMs, text };
 }
 
 /* ---- sending ---- */
-async function sendMail(toName, mode, durMs, text){
-  if (!user){ openSignIn(() => sendMail(toName, mode, durMs, text)); return 'fail'; }
+async function sendMail(c){
+  const { to: toName, urgent, pigeon, temporary, durMs, text } = c;
+  if (!user){ openSignIn(() => sendMail(c)); return 'fail'; }
   if (!text){ toast('Write something first'); return 'fail'; }
   try {
     const { fs, db } = await withTimeout(getFB(), 10000);
@@ -1958,14 +1967,14 @@ async function sendMail(toName, mode, durMs, text){
     if (!target.exists()){ toast('Nobody goes by "' + toName + '"'); return 'fail'; }
     const toUid = target.data().uid;
     if (toUid === user.uid){ toast("You can't mail yourself"); return 'fail'; }
-    if (mode === 'pigeon' && Math.random() < 0.5){ toast('The pigeon got lost. Message not sent.'); return 'lost'; }
+    if (pigeon && Math.random() < 0.5){ toast('The pigeon got lost. Message not sent.'); return 'lost'; }
     await withTimeout(fs.addDoc(fs.collection(db, COL.mail), {
-      from:user.uid, fromName:playerName || defaultName(), to:toUid, text:text.slice(0, 500), mode,
-      urgent:mode === 'urgent', pigeon:mode === 'pigeon', read:false,
-      expiresAt: durMs ? fs.Timestamp.fromMillis(Date.now() + durMs) : null,
+      from:user.uid, fromName:playerName || defaultName(), to:toUid, text:text.slice(0, 500), mode:c.mode,
+      urgent:!!urgent, pigeon:!!pigeon, read:false,
+      expiresAt: temporary && durMs ? fs.Timestamp.fromMillis(Date.now() + durMs) : null,
       createdAt:fs.serverTimestamp(),
     }), 15000);
-    toast(mode === 'pigeon' ? '🕊 Pigeon delivered! Coo.' : mode === 'urgent' ? 'Urgent mail sent to ' + toName : 'Sent to ' + toName);
+    toast(pigeon ? '🕊 Pigeon delivered! Coo.' : urgent ? 'Urgent mail sent to ' + toName : 'Sent to ' + toName);
     return 'sent';
   } catch (e){ console.error(e); toast(fbError(e)); return 'fail'; }
 }
@@ -2103,24 +2112,67 @@ function openConsole(prefill){
   input.focus();
   input.setSelectionRange(input.value.length, input.value.length);
 }
+const EIGHT_BALL = ['It is certain.', 'Without a doubt.', 'Signs point to yes.', 'Ask again later.', 'Don’t count on it.', 'Very doubtful.', 'My sources say no.', 'Absolutely.', 'Ask the pigeon.', 'Outlook good.'];
+function coo(){ beep(480, .22, 'sine', .05, -150); beep(360, .34, 'sine', .05, -90, .24); }
+function confetti(){
+  const cols = ['#e8443a', '#ffd23f', '#3b8be0', '#3fb06a', '#a84bd6', '#e0923b', '#ffffff'];
+  for (let i = 0; i < 90; i++){
+    const d = document.createElement('i');
+    d.className = 'confetti';
+    d.style.left = (Math.random() * 100) + 'vw';
+    d.style.background = cols[i % cols.length];
+    d.style.animationDuration = (2 + Math.random() * 2.2) + 's';
+    d.style.animationDelay = (Math.random() * 0.6) + 's';
+    document.body.appendChild(d);
+    setTimeout(() => d.remove(), 5400);
+  }
+}
+function randomCourse(){
+  const recs = deviceRecs();
+  const pool = (communityList || []).filter(c => c.par)
+    .concat(Object.keys(recs).filter(k => k !== '__migrated').map(k => recs[k]).filter(r => r.par).map(r => ({ ...r, source:'local' })))
+    .concat([{ id:'demo', source:'demo', name:'Demo hills', par:parOfData(getDemoData()) }]);
+  if (!pool.length){ consoleSay('Nothing to roll yet.'); return; }
+  const pick = pool[Math.floor(Math.random() * pool.length)];
+  consoleSay('🎲 Rolled: ' + pick.name);
+  closeConsole();
+  openCourse(pick, 'viewer');
+}
 function closeConsole(){ $('console').hidden = true; $('consoleIn').blur(); }
 function consoleSay(msg){ $('consoleOut').textContent = msg; }
 async function runConsole(raw){
   const line = raw.trim();
   if (!line) return;
-  if (line === '/help'){ consoleSay('/chat name mode "normal": text   ·   mode "pigeon" (50/50)   ·   mode "temporary" (30 seconds): text   ·   mode "urgent"   ·   /mail   ·   /clear'); return; }
+  if (line === '/help'){ consoleSay('/chat name mode "normal": text   ·   mode "pigeon" (50/50)   ·   mode "temporary" (30 seconds): text   ·   mode "urgent"   ·   combine: mode "normal" and "urgent"   ·   /mail   ·   /clear   ·   fun: /coo /confetti /dice /flip /8ball /random'); return; }
   if (line === '/mail'){ closeConsole(); openMail(); return; }
   if (line === '/clear'){ consoleSay(''); return; }
   if (line.startsWith('/chat')){
     const c = parseChatCmd(line);
     if (c.err){ consoleSay(c.err); return; }
     consoleSay('Sending...');
-    const res = await sendMail(c.to, c.mode, c.durMs, c.text);
+    const res = await sendMail(c);
     if (res === 'sent'){ $('consoleIn').value = ''; consoleSay('Sent.'); }
     else if (res === 'lost'){ $('consoleIn').value = ''; consoleSay('The pigeon got lost. Message not sent.'); }
     else consoleSay('Not sent. Check the message above.');
     return;
   }
+  const [cmd, ...rest] = line.split(/\s+/);
+  const arg = rest.join(' ');
+  if (cmd === '/coo'){ coo(); consoleSay('Coo.'); return; }
+  if (cmd === '/confetti'){ confetti(); consoleSay('🎉'); return; }
+  if (cmd === '/flip'){ consoleSay('🪙 ' + (Math.random() < 0.5 ? 'Heads' : 'Tails')); return; }
+  if (cmd === '/dice'){
+    const n = arg ? parseInt(arg, 10) : 6;
+    if (!(n >= 2 && n <= 1000)){ consoleSay('Give /dice a number from 2 to 1000, or leave it off for a d6.'); return; }
+    consoleSay('🎲 ' + (1 + Math.floor(Math.random() * n)) + '  (d' + n + ')');
+    return;
+  }
+  if (cmd === '/8ball'){
+    if (!arg){ consoleSay('Ask something first, like /8ball will I par this hole?'); return; }
+    consoleSay('🎱 ' + EIGHT_BALL[Math.floor(Math.random() * EIGHT_BALL.length)]);
+    return;
+  }
+  if (cmd === '/random'){ randomCourse(); return; }
   consoleSay('Unknown command. Type /help');
 }
 window.addEventListener('keydown', e => {

@@ -126,6 +126,12 @@ input[type=range]{width:100%;accent-color:var(--accent);margin:4px 0 0}
 .meter{height:16px;border:3px solid var(--line);background:var(--bg);margin-bottom:8px}
 .meter div{height:100%;width:0;background:var(--good)}
 
+/* ---------- controls console ---------- */
+#console{position:fixed;left:0;right:0;bottom:0;z-index:40;background:var(--panel);border-top:4px solid var(--line);padding:10px 16px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+#console[hidden]{display:none!important}
+#console .prompt{color:var(--accent);font-size:12px}
+#consoleIn{flex:1;min-width:200px;font:inherit;font-size:10px;background:var(--bg);color:var(--ink);border:3px solid var(--line);padding:9px 10px}
+#consoleOut{width:100%;color:var(--muted);font-size:8px;line-height:1.8;min-height:14px}
 /* ---------- editor toolbar ---------- */
 .editbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:16px}
 .editbar .seg{flex-wrap:wrap}
@@ -178,6 +184,7 @@ details.panel[open] summary{margin-bottom:12px}
         <button class="btn" id="mImport">Import code</button>
         <button class="btn" id="mRedeem">Redeem invite</button>
         <button class="btn" id="mRefresh">Refresh</button>
+        <button class="btn mailBtn" title="Mail (or press /)">Mail</button>
         <button class="btn" id="achBtn">Trophies</button>
         <button class="btn" id="authBtn">Sign in</button>
         <button class="btn sfx">Sound on</button>
@@ -200,6 +207,7 @@ details.panel[open] summary{margin-bottom:12px}
         <button class="btn" id="tabEdit">Edit</button>
         <button class="btn" id="tabPlay">Play</button>
       </div>
+      <button class="btn mailBtn" title="Mail (or press /)">Mail</button>
       <button class="btn" id="playersBtn">Players (1)</button>
       <button class="btn sfx">Sound on</button>
     </div>
@@ -247,7 +255,10 @@ details.panel[open] summary{margin-bottom:12px}
 <div class="panel" id="catPanel-terrain">
             <h2>Terrain</h2>
             <div class="grid2" id="terrains"></div>
-            <div class="grid2" id="colorPick" style="margin-top:10px" hidden></div>
+            <div id="colorPick" style="margin-top:10px" hidden>
+              <label class="note" for="colorInput" style="display:block;margin-bottom:6px">Paint color (any color)</label>
+              <input type="color" id="colorInput" value="#7cbd60" style="width:100%;height:44px;border:3px solid var(--line);background:var(--bg);padding:3px;cursor:pointer">
+            </div>
             <div class="grid3" id="terrainStyle" style="margin-top:10px">
               <button class="btn sm" data-tstyle="paint">Paint</button>
               <button class="btn sm" data-tstyle="fill">Fill</button>
@@ -372,6 +383,11 @@ details.panel[open] summary{margin-bottom:12px}
     </div>
   </section>
 </div>
+<div id="console" hidden>
+  <span class="prompt">&gt;</span>
+  <input id="consoleIn" autocomplete="off" spellcheck="false" aria-label="Controls" placeholder='/chat name mode "normal": hello   ·   /help'>
+  <div id="consoleOut"></div>
+</div>
 <div id="modalRoot"></div>
 
 <script type="module">
@@ -440,8 +456,20 @@ let terrain = new Uint8Array(W*H);
 let zoneGrid = new Uint16Array(W*H), zones = [];
 let colorGrid = new Uint8Array(W*H);
 let curColorIdx = 0;
-const COLOR_PALETTE = [[124,186,96],[220,70,60],[70,130,220],[240,200,70],[150,90,200],[240,140,50],[240,240,240],[230,110,170]];
-const COLOR_NAMES = ['Green','Red','Blue','Yellow','Purple','Orange','White','Pink'];
+let colorPal = [[124,186,96]], curColorRGB = [124,186,96];
+const hexToRgb = h => [parseInt(h.slice(1,3),16), parseInt(h.slice(3,5),16), parseInt(h.slice(5,7),16)];
+const rgbToHex = c => '#' + c.map(v => v.toString(16).padStart(2, '0')).join('');
+function paletteIndexFor(rgb){
+  let best = 0, bd = Infinity;
+  for (let i = 0; i < colorPal.length; i++){
+    const c = colorPal[i];
+    if (c[0] === rgb[0] && c[1] === rgb[1] && c[2] === rgb[2]) return i;
+    const d = (c[0]-rgb[0])**2 + (c[1]-rgb[1])**2 + (c[2]-rgb[2])**2;
+    if (d < bd){ bd = d; best = i; }
+  }
+  if (colorPal.length < 256){ colorPal.push(rgb.slice()); return colorPal.length - 1; }
+  return best;
+}
 const shade = (c, k) => [clamp(c[0]*k, 0, 255), clamp(c[1]*k, 0, 255), clamp(c[2]*k, 0, 255)];
 const elev = new Int8Array(W*H);
 let decos = [];
@@ -621,13 +649,13 @@ const calcPar = () => parOf(tee, hole);
    above are always the currently checked-out hole; `holes[]` holds the rest. ---- */
 function blankHole(fill){
   const t = new Uint8Array(W*H); if (fill !== undefined) t.fill(fill);
-  return { terrain:t, elev:new Int8Array(W*H), decos:[], hazards:[], portals:[], specials:[], rails:[], zoneGrid:new Uint16Array(W*H), zones:[], colorGrid:new Uint8Array(W*H), tee:null, hole:null, undo:[], redo:[] };
+  return { terrain:t, elev:new Int8Array(W*H), decos:[], hazards:[], portals:[], specials:[], rails:[], zoneGrid:new Uint16Array(W*H), zones:[], colorGrid:new Uint8Array(W*H), colorPal:[[124,186,96]], tee:null, hole:null, undo:[], redo:[] };
 }
-function commitHole(){ holes[curHole] = { terrain, elev:elev.slice(), decos, hazards, portals, specials, rails, colorGrid:colorGrid.slice(), zoneGrid:zoneGrid.slice(), zones:zones.map(z => ({ ...z, props:{ ...z.props } })), tee, hole, undo:undoStack, redo:redoStack }; }
+function commitHole(){ holes[curHole] = { terrain, elev:elev.slice(), decos, hazards, portals, specials, rails, colorGrid:colorGrid.slice(), colorPal:colorPal.map(c => c.slice()), zoneGrid:zoneGrid.slice(), zones:zones.map(z => ({ ...z, props:{ ...z.props } })), tee, hole, undo:undoStack, redo:redoStack }; }
 function loadHoleIntoActive(i){
   curHole = i;
   const h = holes[i];
-  terrain = h.terrain; elev.set(h.elev); decos = h.decos.map(d => ({...d})); hazards = (h.hazards || []).map(z => ({...z})); portals = (h.portals || []).map(p => ({...p})); specials = (h.specials || []).map(z => ({...z})); rails = (h.rails || []).map(r => ({ ...r, points:r.points.map(pt => ({...pt})) })); tee = h.tee; hole = h.hole; zoneGrid = h.zoneGrid ? h.zoneGrid.slice() : new Uint16Array(W*H); colorGrid = h.colorGrid ? h.colorGrid.slice() : new Uint8Array(W*H); zones = (h.zones || []).map(z => ({ ...z, props:{ ...z.props } })); selectedObj = null;
+  terrain = h.terrain; elev.set(h.elev); decos = h.decos.map(d => ({...d})); hazards = (h.hazards || []).map(z => ({...z})); portals = (h.portals || []).map(p => ({...p})); specials = (h.specials || []).map(z => ({...z})); rails = (h.rails || []).map(r => ({ ...r, points:r.points.map(pt => ({...pt})) })); tee = h.tee; hole = h.hole; zoneGrid = h.zoneGrid ? h.zoneGrid.slice() : new Uint16Array(W*H); colorPal = (h.colorPal && h.colorPal.length ? h.colorPal : [[124,186,96]]).map(c => c.slice()); colorGrid = h.colorGrid ? h.colorGrid.slice() : new Uint8Array(W*H); curColorIdx = paletteIndexFor(curColorRGB); zones = (h.zones || []).map(z => ({ ...z, props:{ ...z.props } })); selectedObj = null;
   undoStack = h.undo || []; redoStack = h.redo || [];
   rebuildSolids(); dirty = true;
 }
@@ -860,7 +888,7 @@ function buildBase(){
       if (shore(nL) || shore(nR) || shore(nU) || shore(nD)) c = C.foam;
       else waterIdx.push(i);
     } else if (t === T.COLOR){
-      const pc = COLOR_PALETTE[colorGrid[i]] || COLOR_PALETTE[0];
+      const pc = colorPal[colorGrid[i]] || colorPal[0];
       c = (((x + y) >> 2) & 1) ? pc : shade(pc, 0.92);
       if (h < 18) c = shade(pc, 0.8); else if (h > 242) c = shade(pc, 1.12);
       if (nL !== t || nR !== t || nU !== t || nD !== t) c = shade(pc, 0.62);
@@ -1283,8 +1311,8 @@ function render(now){
 /* ================================================================== *
  *  EDITING
  * ================================================================== */
-const snapshot = () => ({ t:terrain.slice(), e:elev.slice(), tee:tee && {...tee}, hole:hole && {...hole}, d:decos.map(d => ({...d})), z:hazards.map(z => ({...z})), p:portals.map(p => ({...p})), sp:specials.map(z => ({...z})), r:rails.map(r => ({ ...r, points:r.points.map(pt => ({...pt})) })), zg:zoneGrid.slice(), cg:colorGrid.slice(), zn:zones.map(z => ({ ...z, props:{ ...z.props } })) });
-function restoreSnap(s){ terrain = s.t.slice(); elev.set(s.e); tee = s.tee && {...s.tee}; hole = s.hole && {...s.hole}; decos = s.d.map(d => ({...d})); hazards = s.z.map(z => ({...z})); portals = s.p.map(p => ({...p})); specials = s.sp.map(z => ({...z})); rails = s.r.map(r => ({ ...r, points:r.points.map(pt => ({...pt})) })); colorGrid = s.cg.slice(); zoneGrid = s.zg.slice(); zones = s.zn.map(z => ({ ...z, props:{ ...z.props } })); rebuildSolids(); dirty = true; }
+const snapshot = () => ({ t:terrain.slice(), e:elev.slice(), tee:tee && {...tee}, hole:hole && {...hole}, d:decos.map(d => ({...d})), z:hazards.map(z => ({...z})), p:portals.map(p => ({...p})), sp:specials.map(z => ({...z})), r:rails.map(r => ({ ...r, points:r.points.map(pt => ({...pt})) })), zg:zoneGrid.slice(), cg:colorGrid.slice(), cp:colorPal.map(c => c.slice()), zn:zones.map(z => ({ ...z, props:{ ...z.props } })) });
+function restoreSnap(s){ terrain = s.t.slice(); elev.set(s.e); tee = s.tee && {...s.tee}; hole = s.hole && {...s.hole}; decos = s.d.map(d => ({...d})); hazards = s.z.map(z => ({...z})); portals = s.p.map(p => ({...p})); specials = s.sp.map(z => ({...z})); rails = s.r.map(r => ({ ...r, points:r.points.map(pt => ({...pt})) })); colorPal = s.cp.map(c => c.slice()); colorGrid = s.cg.slice(); zoneGrid = s.zg.slice(); zones = s.zn.map(z => ({ ...z, props:{ ...z.props } })); rebuildSolids(); dirty = true; }
 function pushUndo(){ undoStack.push(snapshot()); if (undoStack.length > 40) undoStack.shift(); redoStack.length = 0; changed = true; syncUI(); }
 function undo(){ if (!undoStack.length) return; redoStack.push(snapshot()); restoreSnap(undoStack.pop()); changed = true; syncUI(); }
 function redo(){ if (!redoStack.length) return; undoStack.push(snapshot()); restoreSnap(redoStack.pop()); changed = true; syncUI(); }
@@ -1671,7 +1699,7 @@ function serialize(){
       pt:(h.portals || []).map(p => [p.color, p.x, p.y, Math.round((p.scale || 1) * 20), p.props || {}]),
       sp:(h.specials || []).map(z => [SPECIAL_KINDS.indexOf(z.kind), z.x, z.y, Math.round(z.angle || 0), Math.round((z.scale || 1) * 20), Math.round(z.len || 10), z.props || {}]),
       rl:(h.rails || []).map(r => ({ pts:r.points.map(pt => [pt.x, pt.y]), props:r.props || {} })),
-      zg:rleEnc(h.zoneGrid || new Uint16Array(W*H)), zones:(h.zones || []).map(z => ({ p:z.props || {} })), cg:rleEnc(h.colorGrid || new Uint8Array(W*H)),
+      zg:rleEnc(h.zoneGrid || new Uint16Array(W*H)), zones:(h.zones || []).map(z => ({ p:z.props || {} })), cg:rleEnc(h.colorGrid || new Uint8Array(W*H)), cp:(h.colorPal || [[124,186,96]]),
     })),
   };
 }
@@ -1730,8 +1758,11 @@ function parseHoles(o, cap = MAX_HOLES){
       for (let i = 0; i < dec.length; i++){ const v = dec[i]; zg[i] = (v > 0 && v <= zl.length) ? v : 0; }
     }
     const cgArr = new Uint8Array(W*H);
-    if (Array.isArray(hd.cg)) cgArr.set(rleDec(hd.cg, Uint8Array, 0, 7));
-    return { terrain:t, elev:e, decos:ds, hazards:zs, portals:ps, specials:sps, rails:rls, zoneGrid:zg, zones:zl, colorGrid:cgArr, tee:okTee(hd.tee), hole:ok(hd.hole), undo:[], redo:[] };
+    if (Array.isArray(hd.cg)) cgArr.set(rleDec(hd.cg, Uint8Array, 0, 255));
+    const cpArr = (Array.isArray(hd.cp) && hd.cp.length)
+      ? hd.cp.slice(0, 256).filter(c => Array.isArray(c) && c.length === 3).map(c => c.map(v => clamp(v|0, 0, 255)))
+      : [[124,186,96]];
+    return { terrain:t, elev:e, decos:ds, hazards:zs, portals:ps, specials:sps, rails:rls, zoneGrid:zg, zones:zl, colorGrid:cgArr, colorPal:cpArr, tee:okTee(hd.tee), hole:ok(hd.hole), undo:[], redo:[] };
   });
 }
 function applyData(o){
@@ -1795,7 +1826,7 @@ const FB_VER = '10.14.1';
 // If the other app signs people in with a username (turned into a fake email), put that email domain here.
 // Leave empty if people sign in with their real email.
 const USERNAME_EMAIL_DOMAIN = '';
-const COL = { courses:'golf_courses', data:'golf_courseData', comments:'golf_comments', profiles:'golf_profiles', scores:'golf_scores', invites:'golf_invites', redemptions:'golf_redemptions' };
+const COL = { courses:'golf_courses', data:'golf_courseData', comments:'golf_comments', profiles:'golf_profiles', scores:'golf_scores', invites:'golf_invites', redemptions:'golf_redemptions', mail:'golf_mail', usernames:'golf_usernames' };
 let fbPromise = null, fbState = 'connecting', pubBusy = false, user = null, playerName = '';
 const isOwner = () => !!(user && curCourse.source === 'online' && curCourse.ownerId && curCourse.ownerId === user.uid);
 const canEdit = () => isOwner() || !!(user && curCourse.source === 'online' && Array.isArray(curCourse.coOwners) && curCourse.coOwners.includes(user.uid));
@@ -1809,7 +1840,7 @@ function getFB(){
       const [appM, fs, au] = await Promise.all([import(root + 'firebase-app.js'), import(root + 'firebase-firestore.js'), import(root + 'firebase-auth.js')]);
       const app = appM.initializeApp(firebaseConfig);
       const auth = au.getAuth(app);
-      au.onAuthStateChanged(auth, u => { user = u; loadProfile(); });
+      au.onAuthStateChanged(auth, u => { user = u; loadProfile(); if (u) startMail(u.uid); else stopMail(); });
       import(root + 'firebase-analytics.js').then(async an => { if (await an.isSupported()) an.getAnalytics(app); }).catch(() => {});
       return { fs, db: fs.getFirestore(app), au, auth };
     })().catch(e => { fbPromise = null; throw e; });
@@ -1846,7 +1877,12 @@ async function loadProfile(){
     const ref = fs.doc(db, COL.profiles, uid);
     const snap = await withTimeout(fs.getDoc(ref), 12000);
     if (snap.exists() && okName(snap.data().name)) playerName = snap.data().name;
-    else { const nm = defaultName(); await fs.setDoc(ref, { name:nm, createdAt:fs.serverTimestamp(), updatedAt:fs.serverTimestamp() }); playerName = nm; }
+    else {
+      let nm = defaultName().replace(/[^A-Za-z0-9_.-]/g, '').slice(0, 20) || 'player';
+      if (!(await claimName(nm).catch(() => false))) nm = nm.slice(0, 15) + Math.floor(100 + Math.random() * 900);
+      await fs.setDoc(ref, { name:nm, createdAt:fs.serverTimestamp(), updatedAt:fs.serverTimestamp() }); playerName = nm;
+    }
+    if (playerName) claimName(playerName).catch(() => {});
   } catch (e) { console.error(e); playerName = defaultName(); }
   if (user && user.uid === uid){ renderAuth(); syncUI(); }
 }
@@ -1884,6 +1920,222 @@ function openSignIn(after){
     { label:'Cancel' },
   ]);
 }
+/* ================================================================== *
+ *  MAIL + CONTROLS   (/ opens the console, the mail button opens the inbox)
+ * ================================================================== */
+let inbox = [], mailUnsub = null, mailListEl = null;
+const urgentShown = new Set();
+const MAIL_MODES = ['normal', 'pigeon', 'temporary', 'urgent'];
+const closeAllModals = () => { $('modalRoot').innerHTML = ''; modalOpen = false; };
+
+const parseDuration = str => {
+  const m = String(str || '').trim().match(/^(\d+(?:\.\d+)?)\s*(d|day|days|h|hr|hrs|hour|hours|m|min|mins|minute|minutes|s|sec|secs|second|seconds)$/i);
+  if (!m) return 0;
+  const n = parseFloat(m[1]), u = m[2][0].toLowerCase();
+  const ms = n * (u === 'd' ? 86400000 : u === 'h' ? 3600000 : u === 'm' ? 60000 : 1000);
+  return ms > 0 && ms <= 30 * 86400000 ? ms : 0;
+};
+function parseChatCmd(line){
+  const m = line.match(/^\/chat\s+@?(\S+?)(?:\s+mode\s+"([a-z]+)")?\s*(?:\(([^)]*)\))?\s*:\s*(.+)$/i);
+  if (!m) return { err:'Try: /chat name mode "normal": hello' };
+  const to = m[1].toLowerCase(), mode = (m[2] || 'normal').toLowerCase(), text = m[4].trim();
+  if (!MAIL_MODES.includes(mode)) return { err:'Modes: normal, pigeon, temporary, urgent' };
+  let durMs = 0;
+  if (mode === 'temporary'){
+    durMs = parseDuration(m[3]);
+    if (!durMs) return { err:'temporary needs a time, like (30 seconds) or (2 hours)' };
+  }
+  return { to, mode, durMs, text };
+}
+
+/* ---- sending ---- */
+async function sendMail(toName, mode, durMs, text){
+  if (!user){ openSignIn(() => sendMail(toName, mode, durMs, text)); return 'fail'; }
+  if (!text){ toast('Write something first'); return 'fail'; }
+  try {
+    const { fs, db } = await withTimeout(getFB(), 10000);
+    const target = await withTimeout(fs.getDoc(fs.doc(db, COL.usernames, toName)), 12000);
+    if (!target.exists()){ toast('Nobody goes by "' + toName + '"'); return 'fail'; }
+    const toUid = target.data().uid;
+    if (toUid === user.uid){ toast("You can't mail yourself"); return 'fail'; }
+    if (mode === 'pigeon' && Math.random() < 0.5){ toast('The pigeon got lost. Message not sent.'); return 'lost'; }
+    await withTimeout(fs.addDoc(fs.collection(db, COL.mail), {
+      from:user.uid, fromName:playerName || defaultName(), to:toUid, text:text.slice(0, 500), mode,
+      urgent:mode === 'urgent', pigeon:mode === 'pigeon', read:false,
+      expiresAt: durMs ? fs.Timestamp.fromMillis(Date.now() + durMs) : null,
+      createdAt:fs.serverTimestamp(),
+    }), 15000);
+    toast(mode === 'pigeon' ? '🕊 Pigeon delivered! Coo.' : mode === 'urgent' ? 'Urgent mail sent to ' + toName : 'Sent to ' + toName);
+    return 'sent';
+  } catch (e){ console.error(e); toast(fbError(e)); return 'fail'; }
+}
+
+/* ---- inbox ---- */
+function mailTime(ms){ return ms ? new Date(ms).toLocaleString([], { month:'short', day:'numeric', hour:'numeric', minute:'2-digit' }) : 'just now'; }
+function fmtLeft(ms){
+  const s = Math.max(0, Math.round((ms - Date.now()) / 1000));
+  if (s >= 86400) return Math.round(s / 86400) + 'd';
+  if (s >= 3600) return Math.round(s / 3600) + 'h';
+  if (s >= 60) return Math.round(s / 60) + 'm';
+  return s + 's';
+}
+function renderInbox(){
+  if (!mailListEl || !mailListEl.isConnected) return;
+  mailListEl.innerHTML = '';
+  if (!user){ mailListEl.appendChild(el('p', { className:'muted' }, 'Sign in to get mail.')); return; }
+  if (!inbox.length){ mailListEl.appendChild(el('p', { className:'muted' }, 'No mail yet. Press / and try /chat name mode "normal": hi')); return; }
+  inbox.forEach(m => {
+    const r = el('div', { className:'review' });
+    const tags = [];
+    if (m.urgent) tags.push('URGENT');
+    if (m.pigeon) tags.push('pigeon mail');
+    if (m.expiresMs) tags.push('vanishes in ' + fmtLeft(m.expiresMs));
+    r.append(el('div', { className:'rh' }, (m.read ? '' : '● ') + m.fromName + '  ' + mailTime(m.createdMs)));
+    if (tags.length) r.append(el('div', { className:'rd' }, tags.join(' · ')));
+    r.append(el('div', { className:'rt' }, (m.pigeon ? '🕊 ' : '') + m.text));
+    const reply = el('button', { className:'btn sm', style:'margin-top:8px' }, 'Reply');
+    reply.onclick = () => { closeAllModals(); openConsole('/chat ' + m.fromName.toLowerCase() + ' mode "normal": '); };
+    r.append(reply);
+    mailListEl.appendChild(r);
+  });
+}
+function updateMailBadges(){
+  const now = Date.now();
+  const unread = inbox.filter(m => !m.read && !(m.expiresMs && m.expiresMs <= now)).length;
+  document.querySelectorAll('.mailBtn').forEach(b => {
+    b.textContent = unread ? 'Mail (' + unread + ')' : 'Mail';
+    b.classList.toggle('primary', unread > 0);
+  });
+}
+async function markRead(list){
+  const todo = list.filter(m => !m.read);
+  if (!todo.length) return;
+  todo.forEach(m => { m.read = true; });
+  try {
+    const { fs } = await getFB();
+    todo.forEach(m => { if (m.ref) fs.updateDoc(m.ref, { read:true }).catch(() => {}); });
+  } catch (e){ console.error(e); }
+  updateMailBadges(); renderInbox();
+}
+function openMail(){
+  if (!user){ openSignIn(() => openMail()); return; }
+  const box = el('div');
+  mailListEl = el('div');
+  box.appendChild(mailListEl);
+  modal('Mail', box, [{ label:'Close' }]);
+  renderInbox();
+  markRead(inbox.slice());
+}
+document.querySelectorAll('.mailBtn').forEach(b => b.onclick = openMail);
+
+/* ---- urgent: a popup that only goes away with X ---- */
+function showUrgent(m){
+  const ov = el('div', { className:'overlay' });
+  const dlg = el('div', { className:'dialog' });
+  dlg.append(el('h2', { style:'color:var(--accent)' }, '⚠ URGENT from ' + m.fromName));
+  dlg.append(el('div', { className:'mbody' }, (m.pigeon ? '🕊 ' : '') + m.text));
+  const x = el('button', { className:'btn primary' }, 'X');
+  x.onclick = () => { ov.remove(); modalOpen = $('modalRoot').children.length > 0; };
+  dlg.appendChild(x);
+  ov.appendChild(dlg);
+  $('modalRoot').appendChild(ov);
+  modalOpen = true;
+  markRead([m]);
+}
+
+/* ---- live listener + expiry ---- */
+function stopMail(){
+  if (mailUnsub){ try { mailUnsub(); } catch (e){} mailUnsub = null; }
+  inbox = []; urgentShown.clear(); updateMailBadges(); renderInbox();
+}
+async function startMail(uid){
+  stopMail();
+  try {
+    const { fs, db } = await withTimeout(getFB(), 10000);
+    mailUnsub = fs.onSnapshot(fs.query(fs.collection(db, COL.mail), fs.where('to', '==', uid), fs.limit(100)), snap => {
+      const now = Date.now(), list = [];
+      snap.forEach(d => {
+        const v = d.data();
+        const m = {
+          id:d.id, ref:d.ref, from:v.from, fromName:String(v.fromName || 'Player').slice(0, 20), text:String(v.text || ''),
+          mode:v.mode || 'normal', urgent:!!v.urgent, pigeon:!!v.pigeon, read:!!v.read,
+          createdMs:(v.createdAt && v.createdAt.toMillis) ? v.createdAt.toMillis() : now,
+          expiresMs:(v.expiresAt && v.expiresAt.toMillis) ? v.expiresAt.toMillis() : null,
+        };
+        if (m.expiresMs && m.expiresMs <= now){ fs.deleteDoc(d.ref).catch(() => {}); return; }
+        list.push(m);
+        if (m.urgent && !m.read && !urgentShown.has(m.id)){ urgentShown.add(m.id); showUrgent(m); }
+      });
+      list.sort((a, b) => b.createdMs - a.createdMs);
+      inbox = list;
+      updateMailBadges(); renderInbox();
+    }, err => console.error(err));
+  } catch (e){ console.error(e); }
+}
+function purgeMail(){
+  const now = Date.now();
+  const gone = inbox.filter(m => m.expiresMs && m.expiresMs <= now);
+  if (gone.length){
+    inbox = inbox.filter(m => !(m.expiresMs && m.expiresMs <= now));
+    gone.forEach(m => { if (m.ref) getFB().then(({ fs }) => fs.deleteDoc(m.ref)).catch(() => {}); });
+    updateMailBadges(); renderInbox();
+  } else if (inbox.some(m => m.expiresMs)) renderInbox();
+}
+setInterval(purgeMail, 3000);
+
+/* ---- usernames: each profile claims its name once, so /chat can find it ---- */
+async function claimName(nm){
+  if (!user || !nm) return false;
+  const { fs, db } = await withTimeout(getFB(), 10000);
+  const key = String(nm).toLowerCase().slice(0, 20);
+  const ref = fs.doc(db, COL.usernames, key);
+  const snap = await withTimeout(fs.getDoc(ref), 12000);
+  if (snap.exists()) return snap.data().uid === user.uid;
+  try { await withTimeout(fs.setDoc(ref, { uid:user.uid }), 12000); return true; }
+  catch (e){ return false; }
+}
+
+/* ---- controls console ---- */
+function openConsole(prefill){
+  const box = $('console'), input = $('consoleIn');
+  box.hidden = false;
+  if (prefill !== undefined) input.value = prefill;
+  input.focus();
+  input.setSelectionRange(input.value.length, input.value.length);
+}
+function closeConsole(){ $('console').hidden = true; $('consoleIn').blur(); }
+function consoleSay(msg){ $('consoleOut').textContent = msg; }
+async function runConsole(raw){
+  const line = raw.trim();
+  if (!line) return;
+  if (line === '/help'){ consoleSay('/chat name mode "normal": text   ·   mode "pigeon" (50/50)   ·   mode "temporary" (30 seconds): text   ·   mode "urgent"   ·   /mail   ·   /clear'); return; }
+  if (line === '/mail'){ closeConsole(); openMail(); return; }
+  if (line === '/clear'){ consoleSay(''); return; }
+  if (line.startsWith('/chat')){
+    const c = parseChatCmd(line);
+    if (c.err){ consoleSay(c.err); return; }
+    consoleSay('Sending...');
+    const res = await sendMail(c.to, c.mode, c.durMs, c.text);
+    if (res === 'sent'){ $('consoleIn').value = ''; consoleSay('Sent.'); }
+    else if (res === 'lost'){ $('consoleIn').value = ''; consoleSay('The pigeon got lost. Message not sent.'); }
+    else consoleSay('Not sent. Check the message above.');
+    return;
+  }
+  consoleSay('Unknown command. Type /help');
+}
+window.addEventListener('keydown', e => {
+  if (e.target && e.target.id === 'consoleIn'){
+    if (e.key === 'Enter'){ e.preventDefault(); runConsole(e.target.value); }
+    else if (e.key === 'Escape'){ e.preventDefault(); closeConsole(); }
+    return;
+  }
+  const tag = e.target ? e.target.tagName : '';
+  const typing = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || (e.target && e.target.isContentEditable);
+  if (e.key === '/' && !typing && !modalOpen && !e.ctrlKey && !e.metaKey && !e.altKey){
+    e.preventDefault(); openConsole();
+  }
+});
+
 function openAccount(){
   if (!user){ openSignIn(); return; }
   const box = el('div');
@@ -1898,7 +2150,11 @@ function openAccount(){
         (async () => {
           try {
             const { fs, db } = await getFB();
+            if (!/^[A-Za-z0-9_.-]{1,20}$/.test(v)){ msg.textContent = 'Use letters, numbers, _ - . only (no spaces).'; return; }
+            if (!(await claimName(v))){ msg.textContent = 'That name is taken. Pick another.'; return; }
+            const oldKey = (playerName || '').toLowerCase();
             await fs.setDoc(fs.doc(db, COL.profiles, user.uid), { name:v, updatedAt:fs.serverTimestamp() }, { merge:true });
+            if (oldKey && oldKey !== v.toLowerCase()) fs.deleteDoc(fs.doc(db, COL.usernames, oldKey)).catch(() => {});
             playerName = v; renderAuth(); msg.textContent = 'Saved.';
           } catch (e) { msg.textContent = fbError(e); }
         })();
@@ -3466,13 +3722,7 @@ document.querySelectorAll('[data-cat]').forEach(b => b.onclick = () => {
   syncUI();
 });
 document.querySelectorAll('[data-tstyle]').forEach(b => b.onclick = () => { terrainStyle = b.dataset.tstyle; syncUI(); });
-COLOR_PALETTE.forEach((c, i) => {
-  const b = el('button', { className:'btn terrain-btn' }); b.dataset.color = i;
-  const chip = el('span', { className:'chip' }); chip.style.background = 'rgb(' + c.join(',') + ')';
-  b.append(chip, document.createTextNode(COLOR_NAMES[i]));
-  b.onclick = () => { curColorIdx = i; cur = 9; editCat = 'terrain'; if (editMode !== 'build') editMode = 'build'; syncUI(); };
-  $('colorPick').appendChild(b);
-});
+$('colorInput').oninput = e => { curColorRGB = hexToRgb(e.target.value); curColorIdx = paletteIndexFor(curColorRGB); cur = 9; editCat = 'terrain'; if (editMode !== 'build') editMode = 'build'; syncUI(); };
 $('shapeSlider').oninput = e => {
   if (!selectedObj) return;
   const v = +e.target.value / 100;
@@ -3587,7 +3837,7 @@ function syncUI(){
   });
   document.querySelectorAll('[data-tstyle]').forEach(b => b.classList.toggle('on', b.dataset.tstyle === terrainStyle));
   $('colorPick').hidden = !(editCat === 'terrain' && cur === 9);
-  document.querySelectorAll('[data-color]').forEach(b => b.classList.toggle('on', +b.dataset.color === curColorIdx));
+  if ($('colorInput').value !== rgbToHex(curColorRGB)) $('colorInput').value = rgbToHex(curColorRGB);
   ['terrain', 'decor', 'hazards', 'special'].forEach(c => { $('catPanel-' + c).hidden = editCat !== c; });
   $('heightExtra').hidden = !(editCat === 'terrain' && editMode === 'build' && isHeightTool(terrainStyle));
   $('shapePanel').hidden = editMode !== 'shape';

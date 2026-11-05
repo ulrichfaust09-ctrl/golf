@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Pixel Links – Golf Course Maker</title>
-<link rel="icon" href="icon.png" type="image/png">
+<link rel="icon" type="image/png" href="icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
@@ -127,6 +127,14 @@ input[type=range]{width:100%;accent-color:var(--accent);margin:4px 0 0}
 .meter{height:16px;border:3px solid var(--line);background:var(--bg);margin-bottom:8px}
 .meter div{height:100%;width:0;background:var(--good)}
 
+/* ---------- profiles ---------- */
+.pf-card{display:flex;flex-direction:column;gap:14px}
+.pf-top{display:flex;gap:16px;align-items:center}
+.pf-avatar{width:96px;height:96px;flex:none;border:4px solid var(--line);background:var(--bg);display:flex;align-items:center;justify-content:center;overflow:hidden;font-size:22px;color:var(--muted)}
+.pf-avatar img{width:100%;height:100%;object-fit:cover;image-rendering:pixelated}
+.pf-head{min-width:0}
+.pf-head h2{margin:0 0 6px;font-size:14px;line-height:1.4;word-break:break-word}
+.pf-bio{margin:0;padding-top:12px;border-top:3px solid var(--line);line-height:1.8;word-break:break-word}
 /* ---------- fun ---------- */
 .confetti{position:fixed;top:-16px;width:8px;height:12px;z-index:60;pointer-events:none;animation-name:confFall;animation-timing-function:linear;animation-fill-mode:forwards}
 @keyframes confFall{to{transform:translateY(110vh) rotate(720deg)}}
@@ -189,6 +197,7 @@ details.panel[open] summary{margin-bottom:12px}
         <button class="btn" id="mRedeem">Redeem invite</button>
         <button class="btn" id="mRefresh">Refresh</button>
         <button class="btn mailBtn" title="Mail (or press /)">Mail</button>
+        <button class="btn walletBtn" title="Shop">Shop</button>
         <button class="btn" id="achBtn">Trophies</button>
         <button class="btn" id="authBtn">Sign in</button>
         <button class="btn sfx">Sound on</button>
@@ -212,6 +221,7 @@ details.panel[open] summary{margin-bottom:12px}
         <button class="btn" id="tabPlay">Play</button>
       </div>
       <button class="btn mailBtn" title="Mail (or press /)">Mail</button>
+      <button class="btn walletBtn" title="Shop">Shop</button>
       <button class="btn" id="playersBtn">Players (1)</button>
       <button class="btn sfx">Sound on</button>
     </div>
@@ -256,6 +266,14 @@ details.panel[open] summary{margin-bottom:12px}
         <div id="editPanel">
           <button class="btn primary big" id="playBtn" style="margin-bottom:14px">Test play</button>
           <p class="note" id="modeNote" style="margin:0 0 12px"></p>
+          <div class="panel" id="coursePackPanel">
+            <h2>Course pack</h2>
+            <select class="text" id="texturePackSel" aria-label="Course texture pack">
+              <option value="none">None</option>
+            </select>
+            <p class="note">Choose an owned pack to change this course's look. Everyone who plays it sees the pack.</p>
+            <button class="btn wide" id="coursePackShopBtn">Browse packs in Shop</button>
+          </div>
 <div class="panel" id="catPanel-terrain">
             <h2>Terrain</h2>
             <div class="grid2" id="terrains"></div>
@@ -428,6 +446,12 @@ const DECOS = [
   { name:'Statue',    solid:[-2,-2,2,0] },
   { name:'Fence',     solid:[-4,-1,4,0] },
   { name:'Parasol' },
+  { name:'Boulder', solid:[-2,-2,2,0] },
+  { name:'Bookshelf', solid:[-2,-3,2,0] },
+  { name:'Couch', solid:[-3,-1,3,0] },
+  { name:'Table', solid:[-2,-1,2,0] },
+  { name:'Grill', solid:[-1,-2,1,0] },
+  { name:'Aquarium', solid:[-3,-2,3,0] },
 ];
 const MAX_DECOS = 500; // decode safety cap only, not a build limit
 const MAX_HAZARDS = 500; // decode safety cap only, not a build limit
@@ -460,6 +484,27 @@ let terrain = new Uint8Array(W*H);
 let zoneGrid = new Uint16Array(W*H), zones = [];
 let colorGrid = new Uint8Array(W*H);
 let curColorIdx = 0;
+let activePack = 'none', heatMask = null, heatList = [], iceIdx = [];
+let wallet = null, walletUnsub = null, shopBox = null, lastShopMsg = '';
+const PACK_DEFS = {
+  aqua:     { name:'Aqua',     tk:100, sh:120, roll:true,  blurb:'Fish swim in the water, frozen fish in the ice, seaweed, shadows and better waves.' },
+  volcanic: { name:'Volcanic', tk:120, sh:120, roll:true,  blurb:'Water becomes lava, ice becomes basalt with magma cracks, and lava heats what is near it.' },
+  night:    { name:'Night',    tk:90,  sh:108, roll:false, blurb:'A moonlit course with drifting fireflies and glinting water.' },
+  autumn:   { name:'Autumn',   tk:80,  sh:96,  roll:false, blurb:'A warm amber tint with leaves drifting across the course.' },
+  candy:    { name:'Candy',    tk:110, sh:132, roll:false, blurb:'A pastel pink tint with sprinkles tumbling through the air.' },
+  pro:      { name:'Pro Tee',   tk:60,  sh:72,  roll:false, golfer:true, blurb:'White polo, navy visor and a gold club.' },
+  neon:     { name:'Neon Runner', tk:100, sh:120, roll:false, golfer:true, blurb:'Pink shirt, cyan pants, and a light trail on every swing.' },
+  tweed:    { name:'Tweed',     tk:80,  sh:96,  roll:false, golfer:true, blurb:'Brown tweed with a leather-handled club.' },
+  astro:    { name:'Astronaut', tk:150, sh:180, roll:false, golfer:true, blurb:'White suit, gold club, and a sparkle trail.' },
+};
+const PACK_IDS = Object.keys(PACK_DEFS);
+const TERRAIN_IDS = PACK_IDS.filter(id => !PACK_DEFS[id].golfer);
+const GOLFER_IDS = PACK_IDS.filter(id => PACK_DEFS[id].golfer);
+const DECO_OWNED_KEY = { 12:'boulder', 13:'bookshelf', 14:'couch', 15:'table', 16:'grill', 17:'aquarium' };
+const DECO_PACK_KEYS = ['boulder', 'bookshelf', 'couch', 'table', 'grill', 'aquarium'];
+const DECO_PACK_NAMES = { boulder:'Boulder', bookshelf:'Bookshelf', couch:'Couch', table:'Table', grill:'Grill', aquarium:'Aquarium' };
+const ROLL_TABLE = [[37.5,'s',10], [20,'s',16], [17.5,'s',24], [10,'s',36], [7.25,'decor',0], [4.75,'pack','aqua'], [2.25,'pack','volcanic'], [0.75,'s',120]];
+const ROLL_COST = 5, DAILY_TOKENS = 10, STARTER_TOKENS = 50, TRADE_RATE = 1.5, TRADE_CAP = 45, DUP_DECOR_SHARDS = 8, DUP_PACK_SHARDS = 120, DECOR_PACK_SHARDS = 50;
 let colorPal = [[124,186,96]], curColorRGB = [124,186,96];
 const hexToRgb = h => [parseInt(h.slice(1,3),16), parseInt(h.slice(3,5),16), parseInt(h.slice(5,7),16)];
 const rgbToHex = c => '#' + c.map(v => v.toString(16).padStart(2, '0')).join('');
@@ -855,7 +900,18 @@ const frameBuf = imgData.data;
 
 function buildBase(){
   computeSlopes(); computeWalls();
-  waterIdx.length = 0;
+  waterIdx.length = 0; iceIdx.length = 0; heatMask = null; heatList = [];
+  if (activePack === 'volcanic'){
+    heatMask = new Uint8Array(W*H);
+    for (let i = 0; i < W*H; i++) if (terrain[i] === T.WATER){
+      const x = i % W, y = (i / W) | 0;
+      for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++){
+        const xx = x + dx, yy = y + dy;
+        if (inb(xx, yy) && terrain[yy*W + xx] !== T.WATER) heatMask[yy*W + xx] = 1;
+      }
+    }
+    for (let i = 0; i < W*H; i++) if (heatMask[i] && terrain[i] !== T.WATER) heatList.push(i);
+  }
   const heat = editCat === 'terrain' && editMode === 'build' && isHeightTool(terrainStyle) && mode === 'edit' && role === 'editor' && screen === 'game' && !noHeat;
   const trAt = (xx, yy) => xx >= 0 && yy >= 0 && xx < W && yy < H && wm[yy*W+xx] === 0 && terrain[yy*W+xx] === T.TREE;
   const mtAt = (xx, yy) => xx >= 0 && yy >= 0 && xx < W && yy < H && wm[yy*W+xx] === 0 && terrain[yy*W+xx] === T.MOUNTAIN;
@@ -887,9 +943,9 @@ function buildBase(){
       c = h < 36 ? C.sandD : h > 224 ? C.sandL : C.sand;
       if (nL < t || nR < t || nU < t || nD < t) c = C.edgeSand;
     } else if (t === T.WATER){
-      c = h < 128 ? C.water1 : C.water2;
+      c = activePack === 'volcanic' ? (h < 128 ? [226,84,30] : [255,128,40]) : (h < 128 ? C.water1 : C.water2);
       const shore = n => n !== T.WATER && n !== T.TREE && n !== T.VOID && n !== T.MOUNTAIN;
-      if (shore(nL) || shore(nR) || shore(nU) || shore(nD)) c = C.foam;
+      if (shore(nL) || shore(nR) || shore(nU) || shore(nD)) c = activePack === 'volcanic' ? [255,205,90] : C.foam;
       else waterIdx.push(i);
     } else if (t === T.COLOR){
       const pc = colorPal[colorGrid[i]] || colorPal[0];
@@ -897,8 +953,13 @@ function buildBase(){
       if (h < 18) c = shade(pc, 0.8); else if (h > 242) c = shade(pc, 1.12);
       if (nL !== t || nR !== t || nU !== t || nD !== t) c = shade(pc, 0.62);
     } else if (t === T.ICE){
-      c = ((x*2 + y) % 9 === 0 || h > 240) ? C.iceS : (h < 90 ? C.ice2 : C.ice1);
-      if (nL !== t || nR !== t || nU !== t || nD !== t) c = C.iceE;
+      if (activePack === 'volcanic'){
+        c = ((x*7 + y*3) % 23 === 0 || h > 220) ? [255,110,30] : (h < 90 ? [52,44,46] : [70,60,62]);
+      } else {
+        c = ((x*2 + y) % 9 === 0 || h > 240) ? C.iceS : (h < 90 ? C.ice2 : C.ice1);
+        if (nL !== t || nR !== t || nU !== t || nD !== t) c = C.iceE;
+        if (activePack === 'aqua') iceIdx.push(i);
+      }
     } else if (t === T.MOUNTAIN){
       if (!mtAt(x, y-1)) c = C.rockRim;
       else if (!mtAt(x-1, y) || !mtAt(x-1, y-1)) c = C.rockRim;
@@ -929,6 +990,7 @@ function buildBase(){
     }
     let r = c[0]*f, g2 = c[1]*f, b = c[2]*f;
     if (zoneGrid[i]){ r = r*0.8 + 150*0.2; g2 = g2*0.8 + 90*0.2; b = b*0.8 + 220*0.2; }
+    if (heatMask && heatMask[i] && t !== T.WATER){ r = r*0.85 + 255*0.15; g2 = g2*0.92 + 110*0.08; b = b*0.9; }
     if (heat){
       const hv = hs[i], a = clamp(Math.abs(hv) / 24, 0, 0.55);
       if (hv > 0.4){ r += (255 - r)*a; g2 += (150 - g2)*a; b += (60 - b)*a; }
@@ -1093,6 +1155,51 @@ function drawDecoRaw(d, now){
       rect(x-5, y-9, 11, 1, cols[0]);
       break;
     }
+    case 12: { // boulder
+      rect(x-4, y+1, 9, 1, 'rgba(0,0,0,.25)');
+      rect(x-3, y-5, 7, 6, '#8a8a92'); rect(x-2, y-6, 5, 1, '#9e9ea6'); rect(x-3, y-5, 7, 1, '#a8a8b0');
+      rect(x-3, y, 7, 1, '#5c5c64'); rect(x-1, y-4, 2, 1, '#c4c4cc');
+      break;
+    }
+    case 13: { // bookshelf
+      rect(x-3, y-8, 7, 9, '#6b4a2e');
+      for (let r = 0; r < 3; r++){
+        rect(x-2, y-7 + r*3, 5, 2, '#3a2414');
+        rect(x-2, y-7 + r*3, 1, 2, '#c0392b'); rect(x-1, y-7 + r*3, 1, 2, '#2f80c8');
+        rect(x, y-7 + r*3, 1, 2, '#e0b040'); rect(x+1, y-7 + r*3, 1, 2, '#3fb06a');
+      }
+      break;
+    }
+    case 14: { // couch
+      rect(x-5, y+1, 11, 1, 'rgba(0,0,0,.25)');
+      rect(x-4, y-3, 9, 3, '#8c3a5a'); rect(x-4, y-5, 9, 2, '#a84b6c');
+      rect(x-5, y-3, 2, 4, '#7a2f4c'); rect(x+3, y-3, 2, 4, '#7a2f4c');
+      rect(x-3, y, 1, 1, '#4a1f30'); rect(x+2, y, 1, 1, '#4a1f30');
+      break;
+    }
+    case 15: { // table
+      rect(x-4, y+1, 9, 1, 'rgba(0,0,0,.25)');
+      rect(x-4, y-3, 9, 2, '#b07a45'); rect(x-4, y-2, 9, 1, '#8a5a30');
+      rect(x-3, y-1, 1, 3, '#6b4520'); rect(x+2, y-1, 1, 3, '#6b4520');
+      rect(x-1, y-5, 3, 2, '#e8e2d0');
+      break;
+    }
+    case 16: { // grill with fire
+      rect(x-4, y+1, 9, 1, 'rgba(0,0,0,.25)');
+      rect(x-4, y-3, 9, 3, '#4a4a52'); rect(x-4, y-3, 9, 1, '#6a6a72');
+      rect(x-3, y, 1, 2, '#2a2a30'); rect(x+2, y, 1, 2, '#2a2a30');
+      const fl = Math.floor(now / 90) % 3;
+      rect(x-2, y-5 - fl, 5, 2, '#ff7a1a'); rect(x-1, y-6 - (fl % 2), 3, 1, '#ffd23f');
+      rect(x-3, y-4, 1, 1, '#ff5a1a');
+      break;
+    }
+    case 17: { // aquarium (not affected by texture packs)
+      rect(x-5, y+1, 11, 1, 'rgba(0,0,0,.25)');
+      rect(x-5, y-7, 11, 8, '#2a5f8a'); rect(x-4, y-6, 9, 6, '#4fa0d8');
+      rect(x-5, y-7, 11, 1, '#8a6a40'); rect(x-4, y-3, 9, 1, '#2f7fbf');
+      rect(x-2, y-5, 2, 1, '#ffb040'); rect(x+1, y-4, 2, 1, '#ffd23f'); rect(x-1, y-6, 1, 1, '#fff');
+      break;
+    }
   }
 }
 function spawnBurst(x, y, n, colors, spd = 1.3, up = 1, size = 1){
@@ -1152,23 +1259,38 @@ function stepReact(){
   if (react.kind === 'ace' && (react.t === 36 || react.t === 84)) spawnBurst(golferPos.x, golferPos.y - 9, 22, ['#ffd23f', '#e8443a', '#fff', '#3fb0ff', '#7be07b'], 1.8, 2.2, 2);
   if (react.t >= REACT_LEN[react.kind]) react = null;
 }
+const GOLF_SKINS = {
+  classic: { shirt:'#e2443a', pants:'#2b3a67', cap:'#ffffff', club:'#3a3a44', trail:null },
+  pro:     { shirt:'#f4f4f6', pants:'#1e2a4a', cap:'#1a3a7a', club:'#c9a227', trail:null },
+  neon:    { shirt:'#ff4fd8', pants:'#18d8ff', cap:'#18d8ff', club:'#ff4fd8', trail:'#18d8ff' },
+  tweed:   { shirt:'#b5814a', pants:'#6b4a2e', cap:'#5a3f22', club:'#6b4a2e', trail:null },
+  astro:   { shirt:'#e8ecf2', pants:'#9aa6b8', cap:'#dbe9ff', club:'#ffd23f', trail:'#ffd23f' },
+};
+let golferSkin = 'classic';
 function drawDude(o){
+  const P = GOLF_SKINS[golferSkin] || GOLF_SKINS.classic;
   const f = o.f, gx = o.gx, jy = o.jy || 0, y = o.gy + jy, skin = o.skin || '#f0c8a0';
   rect(gx - 2, o.gy, 5, 1, 'rgba(0,0,0,.3)');
   const lh = o.slump ? 2 : 3, top = y - lh - 3;
-  rect(gx - 1, y - lh, 1, lh, '#2b3a67'); rect(gx + 1, y - lh, 1, lh, '#2b3a67');
-  rect(gx - 1, top, 3, 3, '#e2443a');
+  rect(gx - 1, y - lh, 1, lh, P.pants); rect(gx + 1, y - lh, 1, lh, P.pants);
+  rect(gx - 1, top, 3, 3, P.shirt);
   const hy = top - 3 + (o.headDy || 0), hx = gx - 1 + (o.hx || 0);
-  rect(hx, hy, 3, 3, skin); rect(hx, hy, 3, 1, '#ffffff'); rect(hx + (f > 0 ? 3 : -1), hy + 1, 1, 1, '#ffffff');
+  rect(hx, hy, 3, 3, skin); rect(hx, hy, 3, 1, P.cap); rect(hx + (f > 0 ? 3 : -1), hy + 1, 1, 1, '#ffffff');
   if (o.armsUp){
     const at = hy - 2;
     rect(gx - 2, at, 1, top + 2 - at, skin); rect(gx + 2, at, 1, top + 2 - at, skin);
-    rect(gx + 2, at - 5, 1, 5, '#e6e6ea'); rect(gx + 2, at - 6, 2, 1, '#3a3a44');
+    rect(gx + 2, at - 5, 1, 5, '#e6e6ea'); rect(gx + 2, at - 6, 2, 1, P.club);
   } else {
     const hx2 = gx + f, hy2 = top + 1, dx = f * Math.sin(o.phi), dy = Math.cos(o.phi);
+    if (P.trail && o.phi !== undefined){
+      for (let k = 1; k <= 4; k++){
+        const a = o.phi + k * 0.22;
+        rect(Math.round(hx2 + f * Math.sin(a) * 8), Math.round(hy2 + Math.cos(a) * 8), 1, 1, P.trail);
+      }
+    }
     rect(hx2, hy2, 1, 1, skin);
     for (let sp = 1; sp <= 7; sp++) rect(Math.round(hx2 + dx * sp), Math.round(hy2 + dy * sp), 1, 1, '#e6e6ea');
-    rect(Math.round(hx2 + dx * 8), Math.round(hy2 + dy * 8), 2, 1, '#3a3a44');
+    rect(Math.round(hx2 + dx * 8), Math.round(hy2 + dy * 8), 2, 1, P.club);
   }
 }
 function bubbleBg(x, y, w, h){ rect(x, y, w, h, 'rgba(18,22,30,.9)'); }
@@ -1246,10 +1368,15 @@ function render(now){
     const i = waterIdx[k], x = i % W, y = (i / W) | 0;
     const w = Math.sin(y*0.8 + x*0.18 + ph*4) + Math.sin(x*0.5 - ph*2)*0.4;
     const p = i*4;
-    if (w > 1.08){ frameBuf[p] = 132; frameBuf[p+1] = 186; frameBuf[p+2] = 240; }
+    if (activePack === 'volcanic'){
+      const lf = Math.sin(x*0.6 + ph*5) + Math.sin(y*0.9 - ph*3);
+      if (lf > 0.9){ frameBuf[p] = 255; frameBuf[p+1] = 200; frameBuf[p+2] = 80; }
+      else if (lf < -1.0){ frameBuf[p] = 200; frameBuf[p+1] = 60; frameBuf[p+2] = 20; }
+    } else if (w > (activePack === 'aqua' ? 0.95 : 1.08)){ frameBuf[p] = 132; frameBuf[p+1] = 186; frameBuf[p+2] = 240; }
     else if (w < -1.25){ frameBuf[p] = 40; frameBuf[p+1] = 96; frameBuf[p+2] = 176; }
   }
   ctx.putImageData(imgData, 0, 0);
+  drawPackFx(now * 0.001);
 
   if (mode === 'edit' && role === 'editor'){
     drawStaticSprites(now);
@@ -1402,6 +1529,7 @@ function placeMarker(kind, p){
 /* one click = one decoration (never painted by dragging) */
 function placeDeco(p){
   const x = Math.floor(p.x), y = Math.floor(p.y), def = DECOS[curDeco];
+  if (DECO_OWNED_KEY[curDeco] && !(wallet && wallet.decor && wallet.decor[DECO_OWNED_KEY[curDeco]] > 0)){ toast('Get this from a decor pack in the Shop'); return; }
   if (x < 4 || y < 10 || x >= W-4 || y >= H-3){ toast("Can't place it there"); return; }
   const t = terrain[y*W + x];
   if (t === T.VOID || t === T.WATER){ toast('Place it on land'); return; }
@@ -1603,6 +1731,7 @@ function renderProps(){
   });
 }
 function newCourse(name, fill){
+  activePack = 'none';
   holes = [blankHole(fill)]; loadHoleIntoActive(0);
   courseName = name || 'My course'; changed = false; round = null; chainBounds = null;
   courseLocked = false; allowedClubs = ['driver', 'putter']; autoExcluded = []; selectedObj = null; editMode = 'build'; editCat = 'terrain'; tool = null;
@@ -1696,7 +1825,7 @@ function rleDec(r, Ty, lo, hi){
 function serialize(){
   commitHole();
   return {
-    v:4, name:courseName, w:W, h:H, locked:courseLocked, clubs:allowedClubs, autoEx:autoExcluded,
+    v:4, name:courseName, w:W, h:H, texturePack:activePack, locked:courseLocked, clubs:allowedClubs, autoEx:autoExcluded,
     holes: holes.map(h => ({
       tee:h.tee, hole:h.hole, rle:rleEnc(h.terrain), erle:rleEnc(h.elev), decos:h.decos.map(d => [d.t, d.x, d.y, Math.round((d.scale || 1) * 20)]),
       hz:(h.hazards || []).map(z => [HAZ_KINDS.indexOf(z.kind), z.x, z.y, Math.round(z.len), Math.round(z.period * 10), Math.round(z.phase * 100), Math.round(z.angle || 0), z.props || {}]),
@@ -1772,6 +1901,7 @@ function parseHoles(o, cap = MAX_HOLES){
 function applyData(o){
   holes = parseHoles(o);
   courseName = String(o.name || 'My course').slice(0, 20);
+  activePack = TERRAIN_IDS.includes(o.texturePack) ? o.texturePack : 'none'; dirty = true;
   courseLocked = !!o.locked;
   allowedClubs = Array.isArray(o.clubs) ? o.clubs.filter(c => c === 'driver' || c === 'putter') : ['driver', 'putter'];
   if (!allowedClubs.length) allowedClubs = ['driver', 'putter'];
@@ -1830,7 +1960,7 @@ const FB_VER = '10.14.1';
 // If the other app signs people in with a username (turned into a fake email), put that email domain here.
 // Leave empty if people sign in with their real email.
 const USERNAME_EMAIL_DOMAIN = '';
-const COL = { courses:'golf_courses', data:'golf_courseData', comments:'golf_comments', profiles:'golf_profiles', scores:'golf_scores', invites:'golf_invites', redemptions:'golf_redemptions', mail:'golf_mail', usernames:'golf_usernames' };
+const COL = { courses:'golf_courses', data:'golf_courseData', comments:'golf_comments', profiles:'golf_profiles', scores:'golf_scores', invites:'golf_invites', redemptions:'golf_redemptions', mail:'golf_mail', usernames:'golf_usernames', wallets:'golf_wallets' };
 let fbPromise = null, fbState = 'connecting', pubBusy = false, user = null, playerName = '';
 const isOwner = () => !!(user && curCourse.source === 'online' && curCourse.ownerId && curCourse.ownerId === user.uid);
 const canEdit = () => isOwner() || !!(user && curCourse.source === 'online' && Array.isArray(curCourse.coOwners) && curCourse.coOwners.includes(user.uid));
@@ -1844,7 +1974,7 @@ function getFB(){
       const [appM, fs, au] = await Promise.all([import(root + 'firebase-app.js'), import(root + 'firebase-firestore.js'), import(root + 'firebase-auth.js')]);
       const app = appM.initializeApp(firebaseConfig);
       const auth = au.getAuth(app);
-      au.onAuthStateChanged(auth, u => { user = u; loadProfile(); if (u) startMail(u.uid); else stopMail(); });
+      au.onAuthStateChanged(auth, u => { user = u; loadProfile(); if (u){ startMail(u.uid); startWallet(u.uid); } else { stopMail(); stopWallet(); } });
       import(root + 'firebase-analytics.js').then(async an => { if (await an.isSupported()) an.getAnalytics(app); }).catch(() => {});
       return { fs, db: fs.getFirestore(app), au, auth };
     })().catch(e => { fbPromise = null; throw e; });
@@ -2000,7 +2130,11 @@ function renderInbox(){
     if (m.urgent) tags.push('URGENT');
     if (m.pigeon) tags.push('pigeon mail');
     if (m.expiresMs) tags.push('vanishes in ' + fmtLeft(m.expiresMs));
-    r.append(el('div', { className:'rh' }, (m.read ? '' : '● ') + m.fromName + '  ' + mailTime(m.createdMs)));
+    const head = el('div', { className:'rh' });
+    const nameLink = el('span', { style:'text-decoration:underline;cursor:pointer' }, m.fromName);
+    nameLink.onclick = () => openProfile(m.from, false);
+    head.append(document.createTextNode(m.read ? '' : '● '), nameLink, document.createTextNode('  ' + mailTime(m.createdMs)));
+    r.append(head);
     if (tags.length) r.append(el('div', { className:'rd' }, tags.join(' · ')));
     r.append(el('div', { className:'rt' }, (m.pigeon ? '🕊 ' : '') + m.text));
     const reply = el('button', { className:'btn sm', style:'margin-top:8px' }, 'Reply');
@@ -2189,6 +2323,395 @@ window.addEventListener('keydown', e => {
   }
 });
 
+/* ================================================================== *
+ *  PROFILES  (picture on the left, name beside it, description below)
+ * ================================================================== */
+function imageToAvatar(file){
+  return new Promise((resolve, reject) => {
+    if (!file || !file.type || !file.type.startsWith('image/')){ reject(new Error('Pick an image file')); return; }
+    const url = URL.createObjectURL(file), img = new Image();
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const S = 96, c = document.createElement('canvas');
+      c.width = S; c.height = S;
+      const k = Math.min(img.width, img.height);
+      c.getContext('2d').drawImage(img, (img.width - k) / 2, (img.height - k) / 2, k, k, 0, 0, S, S);
+      let out = c.toDataURL('image/jpeg', 0.82);
+      if (out.length > 60000) out = c.toDataURL('image/jpeg', 0.6);
+      if (out.length > 60000){ reject(new Error('That picture is too detailed. Try a simpler one.')); return; }
+      resolve(out);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Could not read that picture')); };
+    img.src = url;
+  });
+}
+function profileCardEl(v, uid){
+  const name = String(v.name || 'Player').slice(0, 20);
+  const card = el('div', { className:'pf-card' });
+  const top = el('div', { className:'pf-top' });
+  const av = el('div', { className:'pf-avatar' });
+  if (typeof v.avatar === 'string' && v.avatar.startsWith('data:image/')) av.appendChild(el('img', { src:v.avatar, alt:'' }));
+  else av.appendChild(el('span', {}, name.charAt(0).toUpperCase() || '?'));
+  const head = el('div', { className:'pf-head' });
+  head.appendChild(el('h2', {}, name));
+  if (v.createdAt && v.createdAt.toMillis) head.appendChild(el('div', { className:'muted' }, 'Joined ' + new Date(v.createdAt.toMillis()).toLocaleDateString([], { month:'short', year:'numeric' })));
+  top.append(av, head);
+  card.append(top, el('p', { className:'pf-bio' }, v.bio ? String(v.bio).slice(0, 120) : 'No description yet.'));
+  return card;
+}
+async function openProfile(uid, isMe){
+  const box = el('div');
+  box.appendChild(el('p', { className:'muted' }, 'Loading profile...'));
+  const buttons = isMe
+    ? [
+        { label:'Edit profile', cls:'primary', fn:() => { closeAllModals(); openEditProfile(); return true; } },
+        { label:'Sign out', fn:() => { getFB().then(f => f.au.signOut(f.auth)).catch(() => {}); } },
+        { label:'Close' },
+      ]
+    : [{ label:'Close' }];
+  modal('Profile', box, buttons);
+  try {
+    const { fs, db } = await withTimeout(getFB(), 10000);
+    const snap = await withTimeout(fs.getDoc(fs.doc(db, COL.profiles, uid)), 12000);
+    box.innerHTML = '';
+    box.appendChild(profileCardEl(snap.exists() ? snap.data() : {}, uid));
+  } catch (e){
+    console.error(e);
+    box.innerHTML = '';
+    box.appendChild(el('p', { className:'muted' }, fbError(e)));
+  }
+}
+async function openEditProfile(){
+  if (!user){ openSignIn(() => openEditProfile()); return; }
+  let cur = { name:playerName || defaultName(), bio:'', avatar:'' };
+  try {
+    const { fs, db } = await withTimeout(getFB(), 10000);
+    const snap = await withTimeout(fs.getDoc(fs.doc(db, COL.profiles, user.uid)), 12000);
+    if (snap.exists()) cur = { name:snap.data().name || cur.name, bio:snap.data().bio || '', avatar:snap.data().avatar || '' };
+  } catch (e){ console.error(e); }
+
+  let avatarNext = cur.avatar;
+  const box = el('div');
+  const nameIn = el('input', { type:'text', className:'text', maxLength:20, value:cur.name });
+  const prev = el('div', { className:'pf-avatar' });
+  const drawPrev = () => {
+    prev.innerHTML = '';
+    if (avatarNext) prev.appendChild(el('img', { src:avatarNext, alt:'' }));
+    else prev.appendChild(el('span', {}, (nameIn.value.trim().charAt(0) || '?').toUpperCase()));
+  };
+  nameIn.oninput = drawPrev;
+  drawPrev();
+  const file = el('input', { type:'file', accept:'image/*' });
+  const removeBtn = el('button', { className:'btn sm' }, 'Remove picture');
+  const msg = el('div', { className:'muted' });
+  removeBtn.onclick = () => { avatarNext = ''; drawPrev(); msg.textContent = 'Picture removed. Save to keep that.'; };
+  file.onchange = async () => {
+    const f = file.files && file.files[0];
+    if (!f) return;
+    msg.textContent = 'Resizing...';
+    try { avatarNext = await imageToAvatar(f); drawPrev(); msg.textContent = 'Picture ready. Save to keep it.'; }
+    catch (e){ msg.textContent = e.message; }
+  };
+  const bioIn = el('textarea', { className:'text', maxLength:120, placeholder:'A quick description' });
+  bioIn.value = cur.bio;
+  const count = el('div', { className:'muted' });
+  const updCount = () => { count.textContent = bioIn.value.length + ' / 120'; };
+  bioIn.oninput = updCount; updCount();
+
+  const top = el('div', { className:'pf-top' });
+  top.appendChild(prev);
+  box.append(top, file, removeBtn, el('p', { className:'muted' }, 'Name'), nameIn, el('p', { className:'muted' }, 'Description'), bioIn, count, msg);
+
+  modal('Edit profile', box, [
+    { label:'Save', cls:'primary', fn:() => {
+        const nm = nameIn.value.trim();
+        if (!/^[A-Za-z0-9_.-]{1,20}$/.test(nm)){ msg.textContent = 'Name: letters, numbers, _ - . only (no spaces).'; return true; }
+        msg.textContent = 'Saving...';
+        (async () => {
+          try {
+            const { fs, db } = await withTimeout(getFB(), 10000);
+            const oldKey = (playerName || '').toLowerCase();
+            if (nm.toLowerCase() !== oldKey && !(await claimName(nm))){ msg.textContent = 'That name is taken.'; return; }
+            await fs.setDoc(fs.doc(db, COL.profiles, user.uid), { name:nm, bio:bioIn.value.trim().slice(0, 120), avatar:avatarNext, updatedAt:fs.serverTimestamp() }, { merge:true });
+            if (oldKey && oldKey !== nm.toLowerCase()) fs.deleteDoc(fs.doc(db, COL.usernames, oldKey)).catch(() => {});
+            playerName = nm; renderAuth(); closeAllModals(); toast('Profile saved');
+          } catch (e){ console.error(e); msg.textContent = fbError(e); }
+        })();
+        return true;
+    } },
+    { label:'Cancel' },
+  ]);
+}
+
+/* ================================================================== *
+ *  SHOP  (tokens, shards, texture packs, decor)
+ *  Spark plan: the game does the work and Firestore rules check each change.
+ * ================================================================== */
+const dayKey = () => { const d = new Date(); return d.getUTCFullYear() * 10000 + (d.getUTCMonth() + 1) * 100 + d.getUTCDate(); };
+const fmtSh = n => (Math.round(n * 10) / 10).toString();
+
+function applyDaily(w){
+  const k = dayKey();
+  if (w.dailyKey >= k) return { ok:false, msg:'Already claimed today. Come back tomorrow.' };
+  w.tokens += DAILY_TOKENS; w.dailyKey = k;
+  return { ok:true, msg:'+' + DAILY_TOKENS + ' tokens' };
+}
+function applyTrade(w, n){
+  if (!Number.isInteger(n) || n < 1) return { ok:false, msg:'Trade a whole number of tokens (1 or more)' };
+  if (w.tokens < n) return { ok:false, msg:'Not enough tokens' };
+  const k = dayKey(), got = n * TRADE_RATE, used = w.tradeDay === k ? w.tradedToday : 0;
+  if (used + got > TRADE_CAP) return { ok:false, msg:'Daily shard limit reached (' + TRADE_CAP + ' a day)' };
+  w.tokens -= n; w.shards += got; w.tradeDay = k; w.tradedToday = used + got;
+  return { ok:true, msg:'Traded ' + n + ' tokens for ' + fmtSh(got) + ' shards' };
+}
+function applyRoll(w, rnd = Math.random){
+  if (w.tokens < ROLL_COST) return { ok:false, msg:'A pack costs ' + ROLL_COST + ' tokens' };
+  w.tokens -= ROLL_COST;
+  let x = rnd() * 100, pick = ROLL_TABLE[ROLL_TABLE.length - 1];
+  for (const row of ROLL_TABLE){ if (x < row[0]){ pick = row; break; } x -= row[0]; }
+  const kind = pick[1], val = pick[2];
+  if (kind === 's'){ w.shards += val; return { ok:true, msg:'Pack: +' + val + ' shards' }; }
+  if (kind === 'pack'){
+    if (w.packs[val]){ w.shards += DUP_PACK_SHARDS; return { ok:true, msg:'Already own ' + PACK_DEFS[val].name + ': converted to ' + DUP_PACK_SHARDS + ' shards' }; }
+    w.packs[val] = true;
+    return { ok:true, msg:'Pack: ' + PACK_DEFS[val].name + ' texture pack unlocked!' };
+  }
+  // decor pack: three different random items; any already owned pays shards
+  w.shards += DECOR_PACK_SHARDS;
+  const got = [];
+  const pool = DECO_PACK_KEYS.slice();
+  for (let i = 0; i < 3; i++){
+    const key = pool.splice(Math.floor(rnd() * pool.length), 1)[0];
+    if (w.decor[key]){ w.shards += DUP_DECOR_SHARDS; w.decor[key] += 1; got.push(DECO_PACK_NAMES[key] + ' (already owned, +' + DUP_DECOR_SHARDS + ')'); }
+    else { w.decor[key] = 1; got.push(DECO_PACK_NAMES[key] + ' (new)'); }
+  }
+  return { ok:true, msg:'Decor pack: ' + got.join(', ') + ' + ' + DECOR_PACK_SHARDS + ' shards' };
+}
+function applyWear(w, id){
+  if (id !== 'classic' && !(w.packs && w.packs[id])) return { ok:false, msg:'Buy that golfer first' };
+  w.skin = id;
+  return { ok:true, msg:'Now wearing ' + (id === 'classic' ? 'Classic' : PACK_DEFS[id].name) };
+}
+const wornSkin = () => {
+  const id = wallet && wallet.skin;
+  return (id && GOLF_SKINS[id] && (id === 'classic' || (wallet.packs && wallet.packs[id]))) ? id : 'classic';
+};
+function applyBuy(w, id, cur){
+  const d = PACK_DEFS[id];
+  if (!d) return { ok:false, msg:'Unknown pack' };
+  if (w.packs[id]) return { ok:false, msg:'You already own ' + d.name };
+  if (cur === 'tk'){
+    if (w.tokens < d.tk) return { ok:false, msg:'Not enough tokens (' + d.tk + ')' };
+    w.tokens -= d.tk;
+  } else {
+    if (w.shards < d.sh) return { ok:false, msg:'Not enough shards (' + d.sh + ')' };
+    w.shards -= d.sh;
+  }
+  w.packs[id] = true;
+  return { ok:true, msg:d.name + ' texture pack unlocked!' };
+}
+
+/* ---- wallet in Firestore ---- */
+function updateWalletBadges(){
+  document.querySelectorAll('.walletBtn').forEach(b => {
+    b.textContent = wallet ? ('🪙 ' + wallet.tokens + ' · ◆ ' + fmtSh(wallet.shards)) : 'Shop';
+  });
+}
+async function startWallet(uid){
+  stopWallet();
+  try {
+    const { fs, db } = await withTimeout(getFB(), 10000);
+    const ref = fs.doc(db, COL.wallets, uid);
+    walletUnsub = fs.onSnapshot(ref, async snap => {
+      if (!snap.exists()){
+        await fs.setDoc(ref, { tokens:STARTER_TOKENS, shards:0, dailyKey:0, tradeDay:0, tradedToday:0, packs:{}, decor:{} }).catch(e => console.error(e));
+        return;
+      }
+      wallet = snap.data();
+      golferSkin = wornSkin();
+      updateWalletBadges();
+      renderShop();
+    }, err => console.error(err));
+  } catch (e){ console.error(e); }
+}
+function stopWallet(){
+  if (walletUnsub){ try { walletUnsub(); } catch (e){} walletUnsub = null; }
+  wallet = null; golferSkin = 'classic'; updateWalletBadges();
+}
+async function walletTx(mutate){
+  if (!user) return { ok:false, msg:'Sign in first' };
+  try {
+    const { fs, db } = await withTimeout(getFB(), 10000);
+    const ref = fs.doc(db, COL.wallets, user.uid);
+    return await fs.runTransaction(db, async tx => {
+      const snap = await tx.get(ref);
+      if (!snap.exists()) return { ok:false, msg:'Wallet not ready yet' };
+      const w = JSON.parse(JSON.stringify(snap.data()));
+      w.packs = w.packs || {}; w.decor = w.decor || {};
+      const r = mutate(w);
+      if (!r.ok) return r;
+      tx.set(ref, w);
+      return r;
+    });
+  } catch (e){ console.error(e); return { ok:false, msg: fbError(e) }; }
+}
+const dailyTx = () => walletTx(applyDaily);
+const tradeTx = n => walletTx(w => applyTrade(w, n));
+const rollTx = () => walletTx(w => applyRoll(w));
+const buyTx = (id, cur) => walletTx(w => applyBuy(w, id, cur));
+const wearTx = id => walletTx(w => applyWear(w, id));
+
+/* ---- the shop window ---- */
+function renderShop(){
+  if (!shopBox || !shopBox.isConnected) return;
+  shopBox.innerHTML = '';
+  if (!user){ shopBox.appendChild(el('p', { className:'muted' }, 'Sign in to get tokens and shards.')); return; }
+  if (!wallet){ shopBox.appendChild(el('p', { className:'muted' }, 'Loading your wallet...')); return; }
+  const w = wallet, k = dayKey();
+  const msg = el('div', { className:'muted' }, lastShopMsg);
+  const say = r => { lastShopMsg = r.msg; msg.textContent = r.msg; };
+  shopBox.appendChild(el('p', { style:'margin:0 0 12px;font-size:11px' }, '🪙 ' + w.tokens + ' tokens     ◆ ' + fmtSh(w.shards) + ' shards'));
+
+  const dailyDone = w.dailyKey >= k;
+  const daily = el('button', { className:'btn wide' }, dailyDone ? 'Daily tokens: claimed today' : 'Claim ' + DAILY_TOKENS + ' daily tokens');
+  daily.disabled = dailyDone;
+  daily.onclick = async () => say(await dailyTx());
+  shopBox.appendChild(daily);
+
+  const left = Math.max(0, TRADE_CAP - (w.tradeDay === k ? w.tradedToday : 0));
+  const tIn = el('input', { type:'number', min:1, step:1, value:1, className:'text', style:'width:90px' });
+  const tBtn = el('button', { className:'btn' }, 'Trade tokens for shards');
+  tBtn.onclick = async () => say(await tradeTx(parseInt(tIn.value, 10)));
+  const tRow = el('div', { style:'display:flex;gap:10px;align-items:center;flex-wrap:wrap' });
+  tRow.append(tIn, tBtn);
+  shopBox.append(el('p', { className:'muted' }, '1 token = 1.5 shards. ' + fmtSh(left) + ' shards left to buy today.'), tRow);
+
+  const rBtn = el('button', { className:'btn wide primary' }, 'Open a pack (' + ROLL_COST + ' tokens)');
+  rBtn.disabled = w.tokens < ROLL_COST;
+  rBtn.onclick = async () => say(await rollTx());
+  shopBox.append(rBtn, el('p', { className:'muted' }, 'Odds: 10 shards 37.5% · 16 shards 20% · 24 shards 17.5% · 36 shards 10% · decor pack + 50 shards 7.25% · Aqua 4.75% · Volcanic 2.25% · 120 shards 0.75%'));
+
+  shopBox.appendChild(el('h2', {}, 'Texture packs'));
+  TERRAIN_IDS.forEach(id => {
+    const d = PACK_DEFS[id], owned = !!w.packs[id];
+    const row = el('div', { className:'review' });
+    row.appendChild(el('div', { className:'rh' }, d.name + (owned ? '  · owned' : '')));
+    row.appendChild(el('div', { className:'rt' }, d.blurb));
+    if (!owned){
+      const bt = el('button', { className:'btn sm' }, 'Buy ' + d.tk + ' tokens');
+      bt.onclick = async () => say(await buyTx(id, 'tk'));
+      const bs = el('button', { className:'btn sm' }, 'Buy ' + d.sh + ' shards');
+      bs.onclick = async () => say(await buyTx(id, 'sh'));
+      const brow = el('div', { style:'margin-top:8px;display:flex;gap:8px;flex-wrap:wrap' });
+      brow.append(bt, bs);
+      row.appendChild(brow);
+    }
+    shopBox.appendChild(row);
+  });
+
+  shopBox.appendChild(el('h2', {}, 'Golfer (the one who swings)'));
+  ['classic'].concat(GOLFER_IDS).forEach(id => {
+    const d = PACK_DEFS[id] || { name:'Classic', blurb:'The default golfer.', tk:0, sh:0 };
+    const owned = id === 'classic' || !!w.packs[id];
+    const worn = wornSkin() === id;
+    const row = el('div', { className:'review' });
+    row.appendChild(el('div', { className:'rh' }, d.name + (worn ? '  · wearing' : (owned ? '  · owned' : ''))));
+    row.appendChild(el('div', { className:'rt' }, d.blurb || ''));
+    const brow = el('div', { style:'margin-top:8px;display:flex;gap:8px;flex-wrap:wrap' });
+    if (owned){
+      if (!worn){
+        const wb = el('button', { className:'btn sm' }, 'Wear');
+        wb.onclick = async () => say(await wearTx(id));
+        brow.appendChild(wb);
+      }
+    } else {
+      const bt = el('button', { className:'btn sm' }, 'Buy ' + d.tk + ' tokens');
+      bt.onclick = async () => say(await buyTx(id, 'tk'));
+      const bs = el('button', { className:'btn sm' }, 'Buy ' + d.sh + ' shards');
+      bs.onclick = async () => say(await buyTx(id, 'sh'));
+      brow.append(bt, bs);
+    }
+    row.appendChild(brow);
+    shopBox.appendChild(row);
+  });
+
+  shopBox.appendChild(el('h2', {}, 'Decor (from decor packs)'));
+  DECO_PACK_KEYS.forEach(key => {
+    const n = (w.decor && w.decor[key]) || 0;
+    shopBox.appendChild(el('p', { className:'muted' }, DECO_PACK_NAMES[key] + ': ' + (n ? 'owned x' + n : 'not yet')));
+  });
+  shopBox.appendChild(msg);
+}
+function openShop(){
+  if (!user){ openSignIn(() => openShop()); return; }
+  shopBox = el('div');
+  modal('Shop', shopBox, [{ label:'Close' }]);
+  renderShop();
+}
+document.querySelectorAll('.walletBtn').forEach(b => b.onclick = openShop);
+
+/* ---------- texture packs ---------- */
+function drawNightFx(t){
+  ctx.fillStyle = 'rgba(12,22,58,.38)'; ctx.fillRect(0, 0, W, H);
+  for (let k = 0; k < 14; k++){
+    const x = (k * 53 + Math.floor(t * 4 * (1 + k % 3))) % W;
+    const y = (k * 29 + 17 + Math.round(Math.sin(t * 0.8 + k) * 4) + H) % H;
+    rect(x, y, 1, 1, Math.sin(t * 5 + k * 3) > 0 ? '#eaff9a' : 'rgba(234,255,154,.25)');
+  }
+  const nw = waterIdx.length;
+  for (let k = 0; k < Math.min(nw, 30); k += 2){
+    const i = waterIdx[(k * 37) % nw], x0 = i % W, y0 = (i / W) | 0;
+    if (Math.sin(t * 2 + k) > 0.6) rect(x0, y0, 1, 1, '#d8e8ff');
+  }
+}
+function drawAutumnFx(t){
+  ctx.fillStyle = 'rgba(214,110,40,.16)'; ctx.fillRect(0, 0, W, H);
+  for (let k = 0; k < 16; k++){
+    const x = (k * 61 + Math.floor(t * (3 + k % 4))) % W;
+    const y = (k * 23 + Math.floor(t * 9 + k * 7)) % H;
+    rect(x, y, 2, 1, k % 2 ? '#e0622a' : '#c23b22');
+  }
+}
+function drawCandyFx(t){
+  ctx.fillStyle = 'rgba(255,120,190,.12)'; ctx.fillRect(0, 0, W, H);
+  const cols = ['#ff7ab8', '#7af0e0', '#ffe36a', '#b38cff'];
+  for (let k = 0; k < 18; k++){
+    const x = (k * 47 + Math.floor(t * 6 * (1 + k % 2))) % W;
+    const y = (k * 31 + Math.round(Math.sin(t + k) * 5) + 140) % H;
+    rect(x, y, 1, 1, cols[k % cols.length]);
+  }
+}
+function drawPackFx(t){
+  if (activePack === 'night') drawNightFx(t);
+  if (activePack === 'autumn') drawAutumnFx(t);
+  if (activePack === 'candy') drawCandyFx(t);
+  if (activePack === 'aqua'){
+    const nw = waterIdx.length;
+    for (let k = 0; k < Math.min(nw, 9); k++){
+      const i = waterIdx[(k * 131 + 7) % nw], x0 = i % W, y0 = (i / W) | 0;
+      const fx = x0 + Math.sin(t * 0.7 + k * 2) * 5, fy = y0 + Math.cos(t * 0.5 + k) * 2;
+      const dir = Math.cos(t * 0.7 + k * 2) > 0 ? 1 : -1;
+      rect(Math.round(fx) - 1, Math.round(fy), 3, 1, '#ffb040');
+      rect(Math.round(fx) - dir * 2, Math.round(fy), 1, 1, '#f08020');
+      rect(Math.round(fx), Math.round(fy) - 1, 1, 1, '#ffe0a0');
+    }
+    for (let k = 0; k < Math.min(nw, 40); k += 3){
+      const i = waterIdx[(k * 53 + 11) % nw], x0 = i % W, y0 = (i / W) | 0;
+      for (let s = 0; s < 3; s++) rect(x0 + Math.round(Math.sin(t * 2 + s + k) * 1.2), y0 - s, 1, 1, '#2f8a4a');
+    }
+    for (let k = 0; k < Math.min(iceIdx.length, 4); k++){
+      const i = iceIdx[(k * 71 + 3) % iceIdx.length], x0 = i % W, y0 = (i / W) | 0;
+      rect(x0, y0, 3, 1, '#d8f6ff'); rect(x0 + 1, y0 - 1, 1, 1, '#9fdcf2');
+    }
+    for (const d of decos) rect(d.x - 2, d.y + 2, 5, 1, 'rgba(0,10,30,.35)');
+  }
+  if (activePack === 'volcanic' && heatList.length){
+    for (let k = 0; k < 40; k++){
+      const i = heatList[(k * 97 + Math.floor(t * 20) * 13) % heatList.length], x0 = i % W, y0 = (i / W) | 0;
+      rect(x0, y0 - 1, 1, 1, Math.sin(t * 9 + k) > 0 ? 'rgba(255,140,40,.55)' : 'rgba(255,220,120,.4)');
+    }
+  }
+}
 function openAccount(){
   if (!user){ openSignIn(); return; }
   const box = el('div');
@@ -2237,7 +2760,7 @@ async function loadCommunity(){
         ownerId:typeof v.ownerId === 'string' ? v.ownerId : null, ownerName:typeof v.ownerName === 'string' ? v.ownerName.slice(0, 20) : '',
         coOwners:Array.isArray(v.coOwners) ? v.coOwners.filter(x => typeof x === 'string') : [],
         thumb:(typeof v.thumb === 'string' && v.thumb.startsWith('data:image/jpeg;base64,')) ? v.thumb : '',
-        locked:!!v.locked, reviewCount, rating:ratingCount > 0 ? ratingSum / ratingCount : 0,
+        texturePack:TERRAIN_IDS.includes(v.texturePack) ? v.texturePack : 'none', locked:!!v.locked, reviewCount, rating:ratingCount > 0 ? ratingSum / ratingCount : 0,
         updatedMs:(v.updatedAt && v.updatedAt.toMillis) ? v.updatedAt.toMillis() : 0,
       });
     });
@@ -2579,6 +3102,11 @@ function cardEl(it, label, canDelete){
   const lockedOut = it.source === 'online' && it.locked && !(user && (it.ownerId === user.uid || (it.coOwners || []).includes(user.uid)));
   if (!lockedOut){ const edit = el('button', { className:'btn sm' }, 'Edit'); edit.onclick = () => openCourse(it, 'editor'); acts.append(edit); }
   acts.prepend(play);
+  if (it.ownerId){
+    const pb = el('button', { className:'btn sm' }, 'Profile');
+    pb.onclick = () => openProfile(it.ownerId, !!(user && user.uid === it.ownerId));
+    acts.append(pb);
+  }
   if (canDelete){
     const del = el('button', { className:'btn sm' }, 'Delete');
     del.onclick = () => confirmModal('Delete course?', 'Delete "' + it.name + '" from this device?', 'Delete', () => {
@@ -2629,6 +3157,7 @@ async function openCourse(rec, wantRole){
     else if (rec.source === 'local') obj = JSON.parse(rec.data);
     else { notify('Loading ' + rec.name + '...'); obj = await fetchOnlineData(rec.id); }
     loadData(obj);
+    if (rec.source === 'online'){ activePack = TERRAIN_IDS.includes(rec.texturePack) ? rec.texturePack : 'none'; dirty = true; }
     courseName = rec.name; curCourse = { id:rec.id, source:rec.source, ownerId:rec.ownerId || null, coOwners:rec.coOwners || [] };
     const ready = allHolesReady(), lockedOut = rec.source === 'online' && rec.locked && !canEdit();
     let forcedViewer = false;
@@ -3826,6 +4355,22 @@ function toggleClub(id){
 $('clubWoodBtn').onclick = () => toggleClub('driver');
 $('clubPutterBtn').onclick = () => toggleClub('putter');
 $('lockBtn').onclick = () => { courseLocked = !courseLocked; changed = true; syncUI(); };
+$('coursePackShopBtn').onclick = openShop;
+TERRAIN_IDS.forEach(id => $('texturePackSel').appendChild(el('option', { value:id }, PACK_DEFS[id].name)));
+$('texturePackSel').onchange = async e => {
+  const v = e.target.value;
+  if (v !== 'none' && !(wallet && wallet.packs && wallet.packs[v])){ toast('You do not own that pack'); syncUI(); return; }
+  if (curCourse.source === 'online' && !canEdit()){ toast('Only the owner or a co-owner can equip this course'); syncUI(); return; }
+  activePack = v; dirty = true; changed = true;
+  if (curCourse.source === 'online' && curCourse.id){
+    try {
+      const { fs, db } = await getFB();
+      await fs.updateDoc(fs.doc(db, COL.courses, curCourse.id), { texturePack:v, updatedAt:fs.serverTimestamp() });
+      toast('Equipped for everyone on this course');
+    } catch (err){ console.error(err); toast(fbError(err)); }
+  }
+  syncUI();
+};
 $('playBtn').onclick = () => { chainBounds = null; startPlay(); };
 $('tabEdit').onclick = () => { if (mode !== 'edit') stopPlay(); };
 $('tabPlay').onclick = () => { if (mode !== 'play') startPlay(); };
@@ -3845,7 +4390,7 @@ $('commSort').onchange = e => { commSort = e.target.value; sortCommunity(); rend
 $('achBtn').onclick = openAchievements;
 $('mNew').onclick = openNew; $('mImport').onclick = openImport;
 $('mRedeem').onclick = openRedeemInvite;
-$('authBtn').onclick = () => user ? openAccount() : openSignIn();
+$('authBtn').onclick = () => user ? openProfile(user.uid, true) : openSignIn();
 $('mRefresh').onclick = () => { if (fbState === 'ok') loadCommunity(); else if (fbState === 'fail') initOnline(); else renderMenu(); };
 
 function setText(id, v){ const e = $(id); if (e._v !== v){ e.textContent = v; e._v = v; } }
@@ -3952,6 +4497,7 @@ function syncUI(){
   setText('gTitle', courseName || 'Untitled');
   $('undoBtn').disabled = !undoStack.length; $('redoBtn').disabled = !redoStack.length;
   const online = curCourse.source === 'online', owned = canEdit();
+  if ($('texturePackSel')) $('texturePackSel').value = activePack;
   $('pubBtn').textContent = online ? (owned ? 'Update online' : 'Publish as new') : 'Publish online';
   $('pubNewBtn').hidden = !(online && owned);
   $('pubBtn').disabled = pubBusy; $('pubNewBtn').disabled = pubBusy;

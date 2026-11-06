@@ -128,6 +128,9 @@ input[type=range]{width:100%;accent-color:var(--accent);margin:4px 0 0}
 .meter div{height:100%;width:0;background:var(--good)}
 
 /* ---------- profiles ---------- */
+img.pxi{width:20px;height:20px;vertical-align:middle;margin-right:6px;image-rendering:pixelated;display:inline-block}
+.mailBtn{position:relative}
+.mailbadge{position:absolute;top:-8px;right:-8px;background:#e0392b;color:#fff;font-size:8px;line-height:12px;min-width:14px;height:14px;text-align:center;border:2px solid #1e2a3a;padding:0 2px;box-sizing:content-box}
 .pf-card{display:flex;flex-direction:column;gap:14px}
 .pf-top{display:flex;gap:16px;align-items:center}
 .pf-avatar{width:96px;height:96px;flex:none;border:4px solid var(--line);background:var(--bg);display:flex;align-items:center;justify-content:center;overflow:hidden;font-size:22px;color:var(--muted)}
@@ -266,14 +269,6 @@ details.panel[open] summary{margin-bottom:12px}
         <div id="editPanel">
           <button class="btn primary big" id="playBtn" style="margin-bottom:14px">Test play</button>
           <p class="note" id="modeNote" style="margin:0 0 12px"></p>
-          <div class="panel" id="coursePackPanel">
-            <h2>Course pack</h2>
-            <select class="text" id="texturePackSel" aria-label="Course texture pack">
-              <option value="none">None</option>
-            </select>
-            <p class="note">Choose an owned pack to change this course's look. Everyone who plays it sees the pack.</p>
-            <button class="btn wide" id="coursePackShopBtn">Browse packs in Shop</button>
-          </div>
 <div class="panel" id="catPanel-terrain">
             <h2>Terrain</h2>
             <div class="grid2" id="terrains"></div>
@@ -357,6 +352,11 @@ details.panel[open] summary{margin-bottom:12px}
           </div>
 
           <div class="panel">
+            <h2>Texture pack (this course)</h2>
+            <select class="text" id="texturePackSel" aria-label="Texture pack">
+              <option value="none">None</option>
+            </select>
+            <p class="note">Packs you own. Everyone who plays this course sees it.</p>
             <h2>Clubs allowed</h2>
             <div class="grid2">
               <button class="btn" id="clubWoodBtn">Wood: on</button>
@@ -452,6 +452,9 @@ const DECOS = [
   { name:'Table', solid:[-2,-1,2,0] },
   { name:'Grill', solid:[-1,-2,1,0] },
   { name:'Aquarium', solid:[-3,-2,3,0] },
+  { name:'Tent', solid:[-3,-2,3,0] },
+  { name:'Campfire', solid:[-2,-1,2,0] },
+  { name:'Picnic table', solid:[-3,-1,3,0] },
 ];
 const MAX_DECOS = 500; // decode safety cap only, not a build limit
 const MAX_HAZARDS = 500; // decode safety cap only, not a build limit
@@ -492,17 +495,19 @@ const PACK_DEFS = {
   night:    { name:'Night',    tk:90,  sh:108, roll:false, blurb:'A moonlit course with drifting fireflies and glinting water.' },
   autumn:   { name:'Autumn',   tk:80,  sh:96,  roll:false, blurb:'A warm amber tint with leaves drifting across the course.' },
   candy:    { name:'Candy',    tk:110, sh:132, roll:false, blurb:'A pastel pink tint with sprinkles tumbling through the air.' },
+  winter:   { name:'Winter',   tk:90,  sh:108, roll:false, blurb:'Snowfall, frosted grass and icy water.' },
+  camping:  { name:'Camping',  tk:60,  sh:72,  roll:false, decorPack:true, blurb:'A tent, a campfire and a picnic table for your course.' },
   pro:      { name:'Pro Tee',   tk:60,  sh:72,  roll:false, golfer:true, blurb:'White polo, navy visor and a gold club.' },
   neon:     { name:'Neon Runner', tk:100, sh:120, roll:false, golfer:true, blurb:'Pink shirt, cyan pants, and a light trail on every swing.' },
   tweed:    { name:'Tweed',     tk:80,  sh:96,  roll:false, golfer:true, blurb:'Brown tweed with a leather-handled club.' },
   astro:    { name:'Astronaut', tk:150, sh:180, roll:false, golfer:true, blurb:'White suit, gold club, and a sparkle trail.' },
 };
 const PACK_IDS = Object.keys(PACK_DEFS);
-const TERRAIN_IDS = PACK_IDS.filter(id => !PACK_DEFS[id].golfer);
+const TERRAIN_IDS = PACK_IDS.filter(id => !PACK_DEFS[id].golfer && !PACK_DEFS[id].decorPack);
 const GOLFER_IDS = PACK_IDS.filter(id => PACK_DEFS[id].golfer);
-const DECO_OWNED_KEY = { 12:'boulder', 13:'bookshelf', 14:'couch', 15:'table', 16:'grill', 17:'aquarium' };
+const DECO_OWNED_KEY = { 12:'boulder', 13:'bookshelf', 14:'couch', 15:'table', 16:'grill', 17:'aquarium', 18:'tent', 19:'campfire', 20:'picnic' };
 const DECO_PACK_KEYS = ['boulder', 'bookshelf', 'couch', 'table', 'grill', 'aquarium'];
-const DECO_PACK_NAMES = { boulder:'Boulder', bookshelf:'Bookshelf', couch:'Couch', table:'Table', grill:'Grill', aquarium:'Aquarium' };
+const DECO_PACK_NAMES = { boulder:'Boulder', bookshelf:'Bookshelf', couch:'Couch', table:'Table', grill:'Grill', aquarium:'Aquarium', tent:'Tent', campfire:'Campfire', picnic:'Picnic table' };
 const ROLL_TABLE = [[37.5,'s',10], [20,'s',16], [17.5,'s',24], [10,'s',36], [7.25,'decor',0], [4.75,'pack','aqua'], [2.25,'pack','volcanic'], [0.75,'s',120]];
 const ROLL_COST = 5, DAILY_TOKENS = 10, STARTER_TOKENS = 50, TRADE_RATE = 1.5, TRADE_CAP = 45, DUP_DECOR_SHARDS = 8, DUP_PACK_SHARDS = 120, DECOR_PACK_SHARDS = 50;
 let colorPal = [[124,186,96]], curColorRGB = [124,186,96];
@@ -537,11 +542,12 @@ let curSpecialKind = 'portal'; // 'portal' | 'speedpad' | 'jumppad' | 'blackhole
 let editCat = 'terrain', editMode = 'build', terrainStyle = 'paint';
 let selectedObj = null; // { cat:'deco'|'hazard'|'portal'|'special', idx }
 let rotating = false;
+let linkMode = null;
 let courseLocked = false, allowedClubs = ['driver', 'putter'], autoExcluded = [];
 let forcedPutter = false, woodGrounded = false;
 const HAZ_PERIOD = { 1:4.4, 2:3.2, 3:2.2, 4:1.5, 5:1.0 };
 const HAZ_KINDS = ['slide', 'spin', 'pendulum', 'popper'];
-const SPECIAL_KINDS = ['speedpad', 'jumppad', 'blackhole', 'randoleporter', 'bouncewall', 'checkpoint', 'gravitater'];
+const SPECIAL_KINDS = ['speedpad', 'jumppad', 'blackhole', 'randoleporter', 'bouncewall', 'checkpoint', 'gravitater', 'cannon', 'conveyor', 'timedgate', 'pressureplate', 'door'];
 
 /* ---- Properties: a small schema per kind. Each object stores its own `props` (only
    the keys it has changed from default), read via getProp(o, key) which falls back
@@ -597,6 +603,18 @@ const PROP_SCHEMAS = {
     { key:'escapeSpeed', type:'slider', min:20, max:400, step:5, def:100, label:'Momentum needed to escape %' },
     { key:'eventHorizon', type:'bool', label:'Event Horizon? (circles before being eaten even on a direct hit)', def:false },
     { key:'orbitTime', type:'slider', min:0.5, max:10, step:0.5, def:2, label:'Time before leaving (s)' },
+  ],
+  pressureplate: [],
+  door: [],
+  timedgate: [
+    { key:'period', type:'slider', min:1, max:8, step:0.5, def:2.5, label:'Seconds open, then seconds closed' },
+  ],
+  conveyor: [
+    { key:'strength', type:'slider', min:25, max:400, step:5, def:100, label:'Push strength %' },
+  ],
+  cannon: [
+    { key:'power', type:'slider', min:50, max:400, step:5, def:150, label:'Power % (launch speed)' },
+    { key:'arc', type:'bool', label:'Arc through the air? (off = rolls out)', def:true },
   ],
   bouncewall: [
     { key:'addMomentum', type:'bool', label:'Add more momentum?', def:true,
@@ -943,7 +961,7 @@ function buildBase(){
       c = h < 36 ? C.sandD : h > 224 ? C.sandL : C.sand;
       if (nL < t || nR < t || nU < t || nD < t) c = C.edgeSand;
     } else if (t === T.WATER){
-      c = activePack === 'volcanic' ? (h < 128 ? [226,84,30] : [255,128,40]) : (h < 128 ? C.water1 : C.water2);
+      c = activePack === 'volcanic' ? (h < 128 ? [226,84,30] : [255,128,40]) : activePack === 'winter' ? (h < 128 ? [150,205,235] : [190,230,250]) : (h < 128 ? C.water1 : C.water2);
       const shore = n => n !== T.WATER && n !== T.TREE && n !== T.VOID && n !== T.MOUNTAIN;
       if (shore(nL) || shore(nR) || shore(nU) || shore(nD)) c = activePack === 'volcanic' ? [255,205,90] : C.foam;
       else waterIdx.push(i);
@@ -954,7 +972,21 @@ function buildBase(){
       if (nL !== t || nR !== t || nU !== t || nD !== t) c = shade(pc, 0.62);
     } else if (t === T.ICE){
       if (activePack === 'volcanic'){
-        c = ((x*7 + y*3) % 23 === 0 || h > 220) ? [255,110,30] : (h < 90 ? [52,44,46] : [70,60,62]);
+        // irregular basalt chunks: each pixel finds its nearest two jittered seeds;
+        // where the two distances are almost equal the pixel sits on a chunk edge, which glows
+        const gx = Math.floor(x / 11), gy = Math.floor(y / 8);
+        let d1 = 1e9, d2 = 1e9, id1 = 0;
+        for (let oy = -1; oy <= 1; oy++) for (let ox = -1; ox <= 1; ox++){
+          const cx = gx + ox, cy = gy + oy;
+          const hh = Math.abs((cx * 73856093) ^ (cy * 19349663));
+          const sx = cx * 11 + (hh % 11), sy = cy * 8 + ((hh >> 3) % 8);
+          const dd = Math.hypot(x - sx, y - sy);
+          if (dd < d1){ d2 = d1; d1 = dd; id1 = hh; } else if (dd < d2) d2 = dd;
+        }
+        const edge = d2 - d1;
+        if (edge < 0.8) c = [255, 96 + Math.round(Math.max(0, 0.8 - edge) * 120), 40];
+        else if (edge < 1.8) c = [96 + (id1 % 4) * 4, 84 + (id1 % 4) * 4, 88];
+        else c = [44 + (id1 % 5) * 3, 36 + (id1 % 4) * 3, 40 + (id1 % 3) * 3];
       } else {
         c = ((x*2 + y) % 9 === 0 || h > 240) ? C.iceS : (h < 90 ? C.ice2 : C.ice1);
         if (nL !== t || nR !== t || nU !== t || nD !== t) c = C.iceE;
@@ -964,7 +996,8 @@ function buildBase(){
       if (!mtAt(x, y-1)) c = C.rockRim;
       else if (!mtAt(x-1, y) || !mtAt(x-1, y-1)) c = C.rockRim;
       else {
-        const snow = hs[i] > 34;
+        const zid = zoneGrid[i], zsnow = !(zid && zones[zid-1] && zones[zid-1].props && zones[zid-1].props.snow === false);
+        const snow = zsnow && hs[i] > 34;
         c = snow ? (h > 210 ? C.snowL : h < 60 ? C.snowD : C.snow) : (h < 70 ? C.rockD : h > 200 ? C.rockL : C.rock);
       }
     } else { // TREE
@@ -1198,6 +1231,25 @@ function drawDecoRaw(d, now){
       rect(x-5, y-7, 11, 8, '#2a5f8a'); rect(x-4, y-6, 9, 6, '#4fa0d8');
       rect(x-5, y-7, 11, 1, '#8a6a40'); rect(x-4, y-3, 9, 1, '#2f7fbf');
       rect(x-2, y-5, 2, 1, '#ffb040'); rect(x+1, y-4, 2, 1, '#ffd23f'); rect(x-1, y-6, 1, 1, '#fff');
+      break;
+    }
+    case 18: { // tent
+      rect(x-4, y+1, 9, 1, 'rgba(0,0,0,.25)');
+      for (let k = 0; k < 5; k++) rect(x - k, y - 5 + k, 2*k + 1, 1, '#d9a441');
+      rect(x-1, y-2, 2, 2, '#5a3a1a');
+      break;
+    }
+    case 19: { // campfire
+      rect(x-3, y, 7, 1, '#6b4520'); rect(x-2, y-1, 5, 1, '#8a5a30');
+      const fl = Math.floor(now / 90) % 3;
+      rect(x-1, y-4 - (fl % 2), 3, 2, '#ff7a1a'); rect(x, y-5, 1, 1, '#ffd23f');
+      break;
+    }
+    case 20: { // picnic table
+      rect(x-5, y+1, 11, 1, 'rgba(0,0,0,.25)');
+      rect(x-4, y-3, 9, 1, '#e8e2d0');
+      rect(x-3, y-3, 1, 1, '#e84a4a'); rect(x-1, y-3, 1, 1, '#e84a4a'); rect(x+1, y-3, 1, 1, '#e84a4a'); rect(x+3, y-3, 1, 1, '#e84a4a');
+      rect(x-4, y-2, 9, 1, '#b07a45'); rect(x-4, y-1, 1, 2, '#6b4520'); rect(x+4, y-1, 1, 2, '#6b4520');
       break;
     }
   }
@@ -1591,7 +1643,7 @@ function placeSpecial(p){
   if ([tee, hole].some(m => m && Math.hypot(m.x - x, m.y - y) < 12)){ toast('Too close to the tee or hole'); return; }
   if (specials.some(z => Math.hypot(z.x - x, z.y - y) < 10)){ toast('Too close to another special'); return; }
   pushUndo();
-  specials.push({ kind:curSpecialKind, x, y, angle:0, scale:1, len:10 });
+  specials.push({ kind:curSpecialKind, x, y, angle:0, scale:1, len:10, uid:specials.reduce((m, z) => Math.max(m, z.uid || 0), 0) + 1 });
 }
 function removeSpecialAt(p){
   let best = -1, bd = 12;
@@ -1729,6 +1781,14 @@ function renderProps(){
     }
     body.appendChild(row);
   });
+  if (kind === 'zone' && o.terrain === T.MOUNTAIN){
+    o.props = o.props || {};
+    const on = o.props.snow !== false;
+    const sb = el('button', { className:'btn wide' + (on ? ' on' : '') }, 'Snowy peaks: ' + (on ? 'Yes' : 'No'));
+    sb.onclick = () => { o.props.snow = !on; dirty = true; changed = true; syncUI(); };
+    body.appendChild(sb);
+  }
+  if (kind === 'pressureplate') body.appendChild(linkRow(o));
 }
 function newCourse(name, fill){
   activePack = 'none';
@@ -1830,9 +1890,9 @@ function serialize(){
       tee:h.tee, hole:h.hole, rle:rleEnc(h.terrain), erle:rleEnc(h.elev), decos:h.decos.map(d => [d.t, d.x, d.y, Math.round((d.scale || 1) * 20)]),
       hz:(h.hazards || []).map(z => [HAZ_KINDS.indexOf(z.kind), z.x, z.y, Math.round(z.len), Math.round(z.period * 10), Math.round(z.phase * 100), Math.round(z.angle || 0), z.props || {}]),
       pt:(h.portals || []).map(p => [p.color, p.x, p.y, Math.round((p.scale || 1) * 20), p.props || {}]),
-      sp:(h.specials || []).map(z => [SPECIAL_KINDS.indexOf(z.kind), z.x, z.y, Math.round(z.angle || 0), Math.round((z.scale || 1) * 20), Math.round(z.len || 10), z.props || {}]),
+      sp:(h.specials || []).map(z => [SPECIAL_KINDS.indexOf(z.kind), z.x, z.y, Math.round(z.angle || 0), Math.round((z.scale || 1) * 20), Math.round(z.len || 10), z.props || {}, z.uid || 0]),
       rl:(h.rails || []).map(r => ({ pts:r.points.map(pt => [pt.x, pt.y]), props:r.props || {} })),
-      zg:rleEnc(h.zoneGrid || new Uint16Array(W*H)), zones:(h.zones || []).map(z => ({ p:z.props || {} })), cg:rleEnc(h.colorGrid || new Uint8Array(W*H)), cp:(h.colorPal || [[124,186,96]]),
+      zg:rleEnc(h.zoneGrid || new Uint16Array(W*H)), zones:(h.zones || []).map(z => ({ p:z.props || {}, t:Number.isInteger(z.terrain) ? z.terrain : -1 })), cg:rleEnc(h.colorGrid || new Uint8Array(W*H)), cp:(h.colorPal || [[124,186,96]]),
     })),
   };
 }
@@ -1869,8 +1929,10 @@ function parseHoles(o, cap = MAX_HOLES){
         angle:Number.isFinite(a[3]) ? ((a[3] % 360) + 360) % 360 : 0, scale:clamp((Number(a[4]) || 20) / 20, 0.4, 4),
         len:clamp(Number(a[5]) || 10, 4, 40),
         props:(a[6] && typeof a[6] === 'object' && !Array.isArray(a[6])) ? a[6] : {},
+        uid:(Number.isInteger(a[7]) && a[7] > 0) ? a[7] : 0,
       });
     }
+    { let nu = sps.reduce((m, z) => Math.max(m, z.uid || 0), 0); for (const z of sps) if (!z.uid) z.uid = ++nu; }
     const rls = [];
     if (Array.isArray(hd.rl)) for (const r of hd.rl.slice(0, MAX_RAILS)){
       const rawPts = Array.isArray(r) ? r : (r && Array.isArray(r.pts) ? r.pts : null);
@@ -1884,7 +1946,7 @@ function parseHoles(o, cap = MAX_HOLES){
     if (Array.isArray(hd.pt)) for (const a of hd.pt.slice(0, MAX_PORTALS)){
       if (Array.isArray(a) && Number.isInteger(a[0]) && a[0] >= 0 && a[0] < PORTAL_COLORS.length && Number.isFinite(a[1]) && Number.isFinite(a[2])) ps.push({ kind:'portal', color:a[0], x:clamp(a[1]|0, 0, W-1), y:clamp(a[2]|0, 0, H-1), scale:clamp((Number(a[3]) || 20) / 20, 0.4, 4), props:(a[4] && typeof a[4] === 'object' && !Array.isArray(a[4])) ? a[4] : {} });
     }
-    const zl = Array.isArray(hd.zones) ? hd.zones.slice(0, 2000).map(z => ({ kind:'zone', props:(z && z.p && typeof z.p === 'object' && !Array.isArray(z.p)) ? z.p : {} })) : [];
+    const zl = Array.isArray(hd.zones) ? hd.zones.slice(0, 2000).map(z => ({ kind:'zone', props:(z && z.p && typeof z.p === 'object' && !Array.isArray(z.p)) ? z.p : {}, terrain:(Number.isInteger(z.t) && z.t >= 0) ? z.t : null })) : [];
     const zg = new Uint16Array(W*H);
     if (Array.isArray(hd.zg)){
       const dec = rleDec(hd.zg, Uint16Array, 0, 65535);
@@ -2057,6 +2119,54 @@ function openSignIn(after){
 /* ================================================================== *
  *  MAIL + CONTROLS   (/ opens the console, the mail button opens the inbox)
  * ================================================================== */
+const PX_ART = {
+  mail: { map:{ a:"#ffd76a", b:"#f0b444", d:"#c9822a" }, rows:["..........", "..........", "daaaaaaaad", "daaaaaaaad", "dbaaaaaabd", "dbbaaaabbd", "dbbbaabbbd", "dbbbbbbbbd", "dddddddddd", ".........."] },
+  shop: { accent:"#f4c542", rows:["..######..", ".#aaaaaa#.", "#aa#aa#aa#", "#aa#aa#aa#", "#aaaaaaaa#", "#aa#aa#aa#", ".#aaaaaa#.", "..######..", "..........", ".........."] },
+  trophy: { accent:"#f4c542", rows:["###....###", "#a#....#a#", "#a######a#", "..#aaaa#..", "...#aa#...", "...#aa#...", "..######..", ".########.", "..........", ".........."] },
+  person: { accent:"#4f8fd6", rows:["....##....", "...#aa#...", "....##....", "..######..", ".#aaaaaa#.", "#aaaaaaaa#", "#aaaaaaaa#", "..######..", "..........", ".........."] },
+  edit: { accent:"#f4c542", rows:[".........#", "........#a", "......#a#.", "....#a#...", "..#a#.....", ".##.......", "..........", "..........", "..........", ".........."] },
+  play: { accent:"#7fd1a0", rows:["#.........", "##........", "#a#.......", "#aa#......", "#aaa#.....", "#aaaa#....", "#aaa#.....", "#aa#......", "#a#.......", "##........"] },
+  publish: { accent:"#4f8fd6", rows:["....##....", "...#aa#...", "..#aaaa#..", ".#aaaaaa#.", "....##....", "....##....", "##......##", "#........#", "#........#", "##########"] },
+  save: { accent:"#4f8fd6", rows:["##########", "#aaaaaaaa#", "#a######a#", "#a######a#", "#aaaaaaaa#", "#aaaaaaaa#", "#aaaaaaaa#", "#a######a#", "##########", ".........."] },
+  undo: { accent:"#f2e3b3", rows:["..........", "...#......", "..#a#.....", ".#aaaaaa#.", "..#a#.....", "...#......", "..........", "..........", "..........", ".........."] },
+  menu: { accent:"#f2e3b3", rows:["##########", "..........", "aaaaaaaaaa", "..........", "##########", "..........", "..........", "..........", "..........", ".........."] },
+  new: { accent:"#7fd1a0", rows:["....##....", "....##....", "....##....", "##########", "##########", "....##....", "....##....", "....##....", "..........", ".........."] },
+  sound: { accent:"#7fd1a0", rows:["..#.......", ".##.....#.", "##a....#..", "#aa#...#..", "#aa#....#.", "#aa#...#..", "##a....#..", ".##.....#.", "..#.......", ".........."] },
+  redo: { accent:"#f2e3b3", rows:["..........", "......#...", ".....#a#..", ".#aaaaaa#.", ".....#a#..", "......#...", "..........", "..........", "..........", ".........."] }
+};
+const PX_CACHE = {};
+function pxIconURL(name){
+  if (PX_CACHE[name]) return PX_CACHE[name];
+  const art = PX_ART[name], cv = document.createElement('canvas');
+  cv.width = 20; cv.height = 20;
+  const g = cv.getContext('2d');
+  for (let y = 0; y < 10; y++) for (let x = 0; x < 10; x++){
+    const ch = art.rows[y][x];
+    if (ch === '.') continue;
+    const col = art.map ? art.map[ch] : (ch === '#' ? '#1e2a3a' : art.accent);
+    if (!col) continue;
+    g.fillStyle = col;
+    g.fillRect(x * 2, y * 2, 2, 2);
+  }
+  return (PX_CACHE[name] = cv.toDataURL('image/png'));
+}
+function addPxIcon(btn, name){
+  if (!btn || btn.querySelector(':scope > img.pxi')) return;
+  const img = document.createElement('img');
+  img.className = 'pxi'; img.alt = ''; img.src = pxIconURL(name);
+  btn.insertBefore(img, btn.firstChild);
+}
+const BTN_ICONS = [
+  ['#mNew','new'], ['#menuBtn','menu'], ['#achBtn','trophy'], ['#playersBtn','person'], ['#authBtn','person'],
+  ['#tabEdit','edit'], ['#tabPlay','play'], ['#playBtn','play'], ['#pubBtn','publish'], ['#pubNewBtn','publish'],
+  ['#saveBtn','save'], ['#undoBtn','undo'], ['#redoBtn','redo'], ['.mailBtn','mail'], ['.walletBtn','shop'],
+];
+function applyButtonIcons(){
+  BTN_ICONS.forEach(([sel, name]) => document.querySelectorAll(sel).forEach(b => addPxIcon(b, name)));
+  document.querySelectorAll('.btn').forEach(b => { if (/^Sound/.test(b.textContent.trim())) addPxIcon(b, 'sound'); });
+}
+applyButtonIcons();
+
 let inbox = [], mailUnsub = null, mailListEl = null;
 const urgentShown = new Set();
 const MAIL_MODES = ['normal', 'pigeon', 'temporary', 'urgent'];
@@ -2105,7 +2215,7 @@ async function sendMail(c){
       expiresAt: temporary && durMs ? fs.Timestamp.fromMillis(Date.now() + durMs) : null,
       createdAt:fs.serverTimestamp(),
     }), 15000);
-    toast(pigeon ? '🕊 Pigeon delivered! Coo.' : urgent ? 'Urgent mail sent to ' + toName : 'Sent to ' + toName);
+    toast(pigeon ? 'Pigeon delivered! Coo.' : urgent ? 'Urgent mail sent to ' + toName : 'Sent to ' + toName);
     return 'sent';
   } catch (e){ console.error(e); toast(fbError(e)); return 'fail'; }
 }
@@ -2136,7 +2246,7 @@ function renderInbox(){
     head.append(document.createTextNode(m.read ? '' : '● '), nameLink, document.createTextNode('  ' + mailTime(m.createdMs)));
     r.append(head);
     if (tags.length) r.append(el('div', { className:'rd' }, tags.join(' · ')));
-    r.append(el('div', { className:'rt' }, (m.pigeon ? '🕊 ' : '') + m.text));
+    r.append(el('div', { className:'rt' }, (m.pigeon ? 'Pigeon: ' : '') + m.text));
     const reply = el('button', { className:'btn sm', style:'margin-top:8px' }, 'Reply');
     reply.onclick = () => { closeAllModals(); openConsole('/chat ' + m.fromName.toLowerCase() + ' mode "normal": '); };
     r.append(reply);
@@ -2147,8 +2257,14 @@ function updateMailBadges(){
   const now = Date.now();
   const unread = inbox.filter(m => !m.read && !(m.expiresMs && m.expiresMs <= now)).length;
   document.querySelectorAll('.mailBtn').forEach(b => {
-    b.textContent = unread ? 'Mail (' + unread + ')' : 'Mail';
-    b.classList.toggle('primary', unread > 0);
+    b.textContent = 'Mail';
+    addPxIcon(b, 'mail');
+    if (unread){
+      const dot = document.createElement('span');
+      dot.className = 'mailbadge';
+      dot.textContent = String(unread);
+      b.appendChild(dot);
+    }
   });
 }
 async function markRead(list){
@@ -2176,8 +2292,8 @@ document.querySelectorAll('.mailBtn').forEach(b => b.onclick = openMail);
 function showUrgent(m){
   const ov = el('div', { className:'overlay' });
   const dlg = el('div', { className:'dialog' });
-  dlg.append(el('h2', { style:'color:var(--accent)' }, '⚠ URGENT from ' + m.fromName));
-  dlg.append(el('div', { className:'mbody' }, (m.pigeon ? '🕊 ' : '') + m.text));
+  dlg.append(el('h2', { style:'color:var(--accent)' }, 'URGENT from ' + m.fromName));
+  dlg.append(el('div', { className:'mbody' }, (m.pigeon ? 'Pigeon: ' : '') + m.text));
   const x = el('button', { className:'btn primary' }, 'X');
   x.onclick = () => { ov.remove(); modalOpen = $('modalRoot').children.length > 0; };
   dlg.appendChild(x);
@@ -2269,7 +2385,7 @@ function randomCourse(){
     .concat([{ id:'demo', source:'demo', name:'Demo hills', par:parOfData(getDemoData()) }]);
   if (!pool.length){ consoleSay('Nothing to roll yet.'); return; }
   const pick = pool[Math.floor(Math.random() * pool.length)];
-  consoleSay('🎲 Rolled: ' + pick.name);
+  consoleSay('Rolled: ' + pick.name);
   closeConsole();
   openCourse(pick, 'viewer');
 }
@@ -2294,17 +2410,17 @@ async function runConsole(raw){
   const [cmd, ...rest] = line.split(/\s+/);
   const arg = rest.join(' ');
   if (cmd === '/coo'){ coo(); consoleSay('Coo.'); return; }
-  if (cmd === '/confetti'){ confetti(); consoleSay('🎉'); return; }
-  if (cmd === '/flip'){ consoleSay('🪙 ' + (Math.random() < 0.5 ? 'Heads' : 'Tails')); return; }
+  if (cmd === '/confetti'){ confetti(); consoleSay('Confetti!'); return; }
+  if (cmd === '/flip'){ consoleSay('Flip: ' + (Math.random() < 0.5 ? 'Heads' : 'Tails')); return; }
   if (cmd === '/dice'){
     const n = arg ? parseInt(arg, 10) : 6;
     if (!(n >= 2 && n <= 1000)){ consoleSay('Give /dice a number from 2 to 1000, or leave it off for a d6.'); return; }
-    consoleSay('🎲 ' + (1 + Math.floor(Math.random() * n)) + '  (d' + n + ')');
+    consoleSay('Roll: ' + (1 + Math.floor(Math.random() * n)) + '  (d' + n + ')');
     return;
   }
   if (cmd === '/8ball'){
     if (!arg){ consoleSay('Ask something first, like /8ball will I par this hole?'); return; }
-    consoleSay('🎱 ' + EIGHT_BALL[Math.floor(Math.random() * EIGHT_BALL.length)]);
+    consoleSay('8-ball: ' + EIGHT_BALL[Math.floor(Math.random() * EIGHT_BALL.length)]);
     return;
   }
   if (cmd === '/random'){ randomCourse(); return; }
@@ -2508,13 +2624,19 @@ function applyBuy(w, id, cur){
     w.shards -= d.sh;
   }
   w.packs[id] = true;
+  if (d.decorPack){
+    w.decor = w.decor || {};
+    ['tent', 'campfire', 'picnic'].forEach(k => { w.decor[k] = (w.decor[k] || 0) + 1; });
+    return { ok:true, msg:d.name + ' pack unlocked: tent, campfire and picnic table' };
+  }
   return { ok:true, msg:d.name + ' texture pack unlocked!' };
 }
 
 /* ---- wallet in Firestore ---- */
 function updateWalletBadges(){
   document.querySelectorAll('.walletBtn').forEach(b => {
-    b.textContent = wallet ? ('🪙 ' + wallet.tokens + ' · ◆ ' + fmtSh(wallet.shards)) : 'Shop';
+    b.textContent = wallet ? (wallet.tokens + ' tokens · ' + fmtSh(wallet.shards) + ' shards') : 'Shop';
+    addPxIcon(b, 'shop');
   });
 }
 async function startWallet(uid){
@@ -2570,7 +2692,7 @@ function renderShop(){
   const w = wallet, k = dayKey();
   const msg = el('div', { className:'muted' }, lastShopMsg);
   const say = r => { lastShopMsg = r.msg; msg.textContent = r.msg; };
-  shopBox.appendChild(el('p', { style:'margin:0 0 12px;font-size:11px' }, '🪙 ' + w.tokens + ' tokens     ◆ ' + fmtSh(w.shards) + ' shards'));
+  shopBox.appendChild(el('p', { style:'margin:0 0 12px;font-size:11px' }, w.tokens + ' tokens  ·  ' + fmtSh(w.shards) + ' shards'));
 
   const dailyDone = w.dailyKey >= k;
   const daily = el('button', { className:'btn wide' }, dailyDone ? 'Daily tokens: claimed today' : 'Claim ' + DAILY_TOKENS + ' daily tokens');
@@ -2592,7 +2714,7 @@ function renderShop(){
   shopBox.append(rBtn, el('p', { className:'muted' }, 'Odds: 10 shards 37.5% · 16 shards 20% · 24 shards 17.5% · 36 shards 10% · decor pack + 50 shards 7.25% · Aqua 4.75% · Volcanic 2.25% · 120 shards 0.75%'));
 
   shopBox.appendChild(el('h2', {}, 'Texture packs'));
-  TERRAIN_IDS.forEach(id => {
+  TERRAIN_IDS.concat(['camping']).forEach(id => {
     const d = PACK_DEFS[id], owned = !!w.packs[id];
     const row = el('div', { className:'review' });
     row.appendChild(el('div', { className:'rh' }, d.name + (owned ? '  · owned' : '')));
@@ -2636,7 +2758,7 @@ function renderShop(){
   });
 
   shopBox.appendChild(el('h2', {}, 'Decor (from decor packs)'));
-  DECO_PACK_KEYS.forEach(key => {
+  Object.keys(DECO_PACK_NAMES).forEach(key => {
     const n = (w.decor && w.decor[key]) || 0;
     shopBox.appendChild(el('p', { className:'muted' }, DECO_PACK_NAMES[key] + ': ' + (n ? 'owned x' + n : 'not yet')));
   });
@@ -2652,63 +2774,86 @@ document.querySelectorAll('.walletBtn').forEach(b => b.onclick = openShop);
 
 /* ---------- texture packs ---------- */
 function drawNightFx(t){
-  ctx.fillStyle = 'rgba(12,22,58,.38)'; ctx.fillRect(0, 0, W, H);
-  for (let k = 0; k < 14; k++){
+  ctx.fillStyle = 'rgba(12,22,58,.45)'; ctx.fillRect(0, 0, W, H);
+  for (let k = 0; k < 20; k++){
     const x = (k * 53 + Math.floor(t * 4 * (1 + k % 3))) % W;
-    const y = (k * 29 + 17 + Math.round(Math.sin(t * 0.8 + k) * 4) + H) % H;
-    rect(x, y, 1, 1, Math.sin(t * 5 + k * 3) > 0 ? '#eaff9a' : 'rgba(234,255,154,.25)');
+    const y = (k * 29 + 17 + Math.round(Math.sin(t * 0.8 + k) * 5) + H) % H;
+    if (Math.sin(t * 5 + k * 3) > -0.2){
+      rect(x - 1, y - 1, 3, 3, 'rgba(234,255,154,.25)');
+      rect(x, y, 1, 1, '#eaff9a');
+    }
   }
   const nw = waterIdx.length;
-  for (let k = 0; k < Math.min(nw, 30); k += 2){
+  for (let k = 0; k < Math.min(nw, 40); k += 2){
     const i = waterIdx[(k * 37) % nw], x0 = i % W, y0 = (i / W) | 0;
-    if (Math.sin(t * 2 + k) > 0.6) rect(x0, y0, 1, 1, '#d8e8ff');
+    if (Math.sin(t * 2 + k) > 0.4) rect(x0, y0, 2, 1, '#d8e8ff');
   }
 }
 function drawAutumnFx(t){
-  ctx.fillStyle = 'rgba(214,110,40,.16)'; ctx.fillRect(0, 0, W, H);
-  for (let k = 0; k < 16; k++){
+  ctx.fillStyle = 'rgba(214,110,40,.22)'; ctx.fillRect(0, 0, W, H);
+  const cols = ['#e0622a', '#c23b22', '#f0a030'];
+  for (let k = 0; k < 24; k++){
     const x = (k * 61 + Math.floor(t * (3 + k % 4))) % W;
     const y = (k * 23 + Math.floor(t * 9 + k * 7)) % H;
-    rect(x, y, 2, 1, k % 2 ? '#e0622a' : '#c23b22');
+    rect(x, y, 3, 2, cols[k % cols.length]);
+    rect(x + 1, y - 1, 1, 1, cols[k % cols.length]);
   }
 }
 function drawCandyFx(t){
-  ctx.fillStyle = 'rgba(255,120,190,.12)'; ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = 'rgba(255,120,190,.18)'; ctx.fillRect(0, 0, W, H);
   const cols = ['#ff7ab8', '#7af0e0', '#ffe36a', '#b38cff'];
-  for (let k = 0; k < 18; k++){
+  for (let k = 0; k < 26; k++){
     const x = (k * 47 + Math.floor(t * 6 * (1 + k % 2))) % W;
     const y = (k * 31 + Math.round(Math.sin(t + k) * 5) + 140) % H;
-    rect(x, y, 1, 1, cols[k % cols.length]);
+    rect(x, y, 2, 1, cols[k % cols.length]);
+  }
+}
+function drawWinterFx(t){
+  ctx.fillStyle = 'rgba(200,225,255,.22)'; ctx.fillRect(0, 0, W, H);
+  for (let k = 0; k < 30; k++){
+    const x = (k * 41 + Math.floor(Math.sin(t + k) * 3) + W) % W;
+    const y = (k * 23 + Math.floor(t * 12 + k * 5)) % H;
+    if (k % 3 === 0) rect(x, y, 2, 2, '#ffffff'); else rect(x, y, 1, 1, '#e8f4ff');
   }
 }
 function drawPackFx(t){
   if (activePack === 'night') drawNightFx(t);
   if (activePack === 'autumn') drawAutumnFx(t);
   if (activePack === 'candy') drawCandyFx(t);
+  if (activePack === 'winter') drawWinterFx(t);
   if (activePack === 'aqua'){
     const nw = waterIdx.length;
-    for (let k = 0; k < Math.min(nw, 9); k++){
+    for (let k = 0; k < Math.min(nw, 12); k++){
       const i = waterIdx[(k * 131 + 7) % nw], x0 = i % W, y0 = (i / W) | 0;
-      const fx = x0 + Math.sin(t * 0.7 + k * 2) * 5, fy = y0 + Math.cos(t * 0.5 + k) * 2;
-      const dir = Math.cos(t * 0.7 + k * 2) > 0 ? 1 : -1;
-      rect(Math.round(fx) - 1, Math.round(fy), 3, 1, '#ffb040');
-      rect(Math.round(fx) - dir * 2, Math.round(fy), 1, 1, '#f08020');
-      rect(Math.round(fx), Math.round(fy) - 1, 1, 1, '#ffe0a0');
+      const ang = t * 0.7 + k * 2;
+      const ix = Math.round(x0 + Math.sin(ang) * 6), iy = Math.round(y0 + Math.cos(t * 0.5 + k) * 2);
+      const dir = Math.cos(ang) > 0 ? 1 : -1;
+      rect(ix - 2, iy, 5, 2, '#ffb040');
+      rect(ix - 2, iy, 5, 1, '#ffd27a');
+      rect(dir > 0 ? ix - 4 : ix + 3, iy - 1, 2, 4, '#f08020');
+      rect(ix + dir, iy, 1, 1, '#1e2a3a');
     }
-    for (let k = 0; k < Math.min(nw, 40); k += 3){
+    for (let k = 0; k < Math.min(nw, 60); k += 3){
       const i = waterIdx[(k * 53 + 11) % nw], x0 = i % W, y0 = (i / W) | 0;
-      for (let s = 0; s < 3; s++) rect(x0 + Math.round(Math.sin(t * 2 + s + k) * 1.2), y0 - s, 1, 1, '#2f8a4a');
+      for (let s2 = 0; s2 < 6; s2++){
+        const sway = Math.round(Math.sin(t * 2 + s2 * 0.7 + k) * 1.2);
+        rect(x0 + sway, y0 - s2, 2, 1, s2 % 2 ? '#3fb06a' : '#2f8a4a');
+      }
     }
-    for (let k = 0; k < Math.min(iceIdx.length, 4); k++){
+    for (let k = 0; k < Math.min(iceIdx.length, 6); k++){
       const i = iceIdx[(k * 71 + 3) % iceIdx.length], x0 = i % W, y0 = (i / W) | 0;
-      rect(x0, y0, 3, 1, '#d8f6ff'); rect(x0 + 1, y0 - 1, 1, 1, '#9fdcf2');
+      rect(x0 - 1, y0, 5, 2, '#d8f6ff');
+      rect(x0 - 1, y0, 5, 1, '#f4fdff');
+      rect(x0 + 3, y0 - 1, 2, 4, '#9fdcf2');
     }
-    for (const d of decos) rect(d.x - 2, d.y + 2, 5, 1, 'rgba(0,10,30,.35)');
+    for (const d of decos) rect(d.x - 3, d.y + 2, 7, 1, 'rgba(0,10,30,.35)');
   }
   if (activePack === 'volcanic' && heatList.length){
-    for (let k = 0; k < 40; k++){
+    for (let k = 0; k < 60; k++){
       const i = heatList[(k * 97 + Math.floor(t * 20) * 13) % heatList.length], x0 = i % W, y0 = (i / W) | 0;
-      rect(x0, y0 - 1, 1, 1, Math.sin(t * 9 + k) > 0 ? 'rgba(255,140,40,.55)' : 'rgba(255,220,120,.4)');
+      const hot = Math.sin(t * 9 + k) > 0;
+      rect(x0 - 1, y0 - 2, 2, 2, hot ? 'rgba(255,140,40,.45)' : 'rgba(255,220,120,.35)');
+      rect(x0, y0 - 1, 1, 1, hot ? '#ffb040' : '#ffe39a');
     }
   }
 }
@@ -3095,7 +3240,7 @@ function cardEl(it, label, canDelete){
   const bits = [it.par ? 'Par ' + it.par : 'Unfinished', label];
   if (it.reviewCount) bits.push((it.rating ? '★' + it.rating.toFixed(1) + ' ' : '') + it.reviewCount + (it.reviewCount === 1 ? ' review' : ' reviews'));
   if (b !== null) bits.push('Best ' + b);
-  if (it.locked) bits.push('🔒');
+  if (it.locked) bits.push('locked');
   body.append(el('div', { className:'cc-title' }, it.name), el('div', { className:'cc-meta' }, bits.join('  |  ')));
   const acts = el('div', { className:'cc-actions' });
   const play = el('button', { className:'btn sm primary' }, 'Play'); play.disabled = !it.par; play.onclick = () => openCourse(it, 'viewer');
@@ -3803,6 +3948,60 @@ function checkSpecials(){
       spawnBurst(ball.x, ball.y, 20, [destCol, '#fff', '#e0923b'], 1.4, 1.2, Math.round(2 * PORTAL_SCALE));
       return;
     }
+    if (sp.kind === 'door'){
+      if (doorOpen(sp)) continue;
+      const rad = (sp.angle || 0) * Math.PI / 180, ux = Math.cos(rad), uy = Math.sin(rad);
+      const sc = sp.scale || 1, half = 6 * sc, thick = 1.2 * sc;
+      const dx = ball.x - cx, dy = ball.y - cy;
+      const along = dx * ux + dy * uy, across = -dx * uy + dy * ux;
+      if (Math.abs(along) > half || Math.abs(across) > thick + 1.5) continue;
+      const side = across >= 0 ? 1 : -1, nx = -uy * side, ny = ux * side;
+      const into = ball.vx * nx + ball.vy * ny;
+      if (into < 0){ ball.vx -= 1.5 * into * nx; ball.vy -= 1.5 * into * ny; }
+      const target = thick + 0.6, gap = target - Math.abs(across);
+      if (gap > 0){ ball.x += nx * gap; ball.y += ny * gap; }
+      sfx.bounce();
+      continue;
+    }
+    if (sp.kind === 'timedgate'){
+      const period = getProp(sp, 'period');
+      if (Math.floor(simTime / period) % 2 === 0) continue;
+      const rad = (sp.angle || 0) * Math.PI / 180, ux = Math.cos(rad), uy = Math.sin(rad);
+      const sc = sp.scale || 1, half = 6 * sc, thick = 1.2 * sc;
+      const dx = ball.x - cx, dy = ball.y - cy;
+      const along = dx * ux + dy * uy, across = -dx * uy + dy * ux;
+      if (Math.abs(along) > half || Math.abs(across) > thick + 1.5) continue;
+      const side = across >= 0 ? 1 : -1, nx = -uy * side, ny = ux * side;
+      const into = ball.vx * nx + ball.vy * ny;
+      if (into < 0){ ball.vx -= 1.5 * into * nx; ball.vy -= 1.5 * into * ny; }
+      const target = thick + 0.6, gap = target - Math.abs(across);
+      if (gap > 0){ ball.x += nx * gap; ball.y += ny * gap; }
+      sfx.bounce();
+      continue;
+    }
+    if (sp.kind === 'conveyor'){
+      const rad = (sp.angle || 0) * Math.PI / 180, ux = Math.cos(rad), uy = Math.sin(rad);
+      const sc = sp.scale || 1, half = 5 * sc, width = 2.5 * sc;
+      const dx = ball.x - cx, dy = ball.y - cy;
+      const along = dx * ux + dy * uy, across = -dx * uy + dy * ux;
+      if (Math.abs(along) > half || Math.abs(across) > width) continue;
+      const push = getProp(sp, 'strength') / 100 * 0.03;
+      if (Math.hypot(ball.vx, ball.vy) < 4){ ball.vx += ux * push; ball.vy += uy * push; }
+      continue;
+    }
+    if (sp.kind === 'cannon'){
+      if (ball.padCd > 0 || d > 2.2 * (sp.scale || 1)) continue;
+      const rad = (sp.angle || 0) * Math.PI / 180, speed = 2.5 * (getProp(sp, 'power') / 100);
+      const ux = Math.cos(rad), uy = Math.sin(rad);
+      ball.x = cx + ux * 3; ball.y = cy + uy * 3;
+      ball.vx = ux * speed; ball.vy = uy * speed;
+      ball.padCd = 30;
+      if (getProp(sp, 'arc')){ ball.air = true; ball.t = 0; ball.T = clamp(Math.round(12 + speed * 6), 12, 60); ball.H = clamp(speed * 4, 6, 40); }
+      else ball.air = false;
+      sfx.hit();
+      spawnBurst(cx, cy, 16, ['#ff7a1a', '#ffd23f', '#3a3a44'], 1.4, 1.2, 2);
+      return;
+    }
     if (ball.padCd > 0 || d > 2.4 * (sp.scale || 1)) continue;
     const speed = Math.hypot(ball.vx, ball.vy);
     if (speed < 0.08) continue;
@@ -3852,6 +4051,48 @@ function drawOneSpecial(sp, t){
       rect(Math.round(x + .5 + Math.cos(a) * rr), Math.round(y + .5 + Math.sin(a) * rr), 1, 1, '#8a6bc0');
     }
     rect(x - 2, y - 2, 5, 5, '#120a20'); rect(x - 1, y - 1, 3, 3, '#000');
+  } else if (sp.kind === 'pressureplate'){
+    const down = !!sp._down, linked = !!(sp.props && sp.props.linkId);
+    ctx.save(); ctx.translate(x + .5, y + .5); ctx.scale(s, s);
+    rect(-4, 2, 9, 1, 'rgba(0,0,0,.25)');
+    rect(-4, down ? -1 : -2, 9, down ? 3 : 4, down ? '#7a7f8a' : '#9aa0ad');
+    rect(-4, down ? 1 : 2, 9, 1, '#5a5f6a');
+    if (linked) rect(-1, down ? -2 : -3, 2, 1, '#ffd23f');
+    ctx.restore();
+  } else if (sp.kind === 'door'){
+    const open = doorOpen(sp);
+    ctx.save(); ctx.translate(x + .5, y + .5); ctx.rotate(rad); ctx.scale(s, s);
+    rect(-7, -3, 2, 6, '#5a5a66'); rect(5, -3, 2, 6, '#5a5a66');
+    if (open) rect(-6, -5, 12, 1, '#8a8f9a');
+    else { rect(-6, -1, 12, 2, '#8a8f9a'); rect(-6, -1, 12, 1, '#b0b5c0'); }
+    ctx.restore();
+  } else if (sp.kind === 'timedgate'){
+    const open = Math.floor(simTime / getProp(sp, 'period')) % 2 === 0;
+    ctx.save(); ctx.translate(x + .5, y + .5); ctx.rotate(rad); ctx.scale(s, s);
+    rect(-7, -3, 2, 6, '#5a5a66'); rect(5, -3, 2, 6, '#5a5a66');
+    if (open){
+      rect(-6, -5, 12, 1, 'rgba(216,68,58,.55)');
+      rect(-6, -4, 1, 1, '#d8443a'); rect(5, -4, 1, 1, '#d8443a');
+    } else {
+      rect(-6, -1, 12, 2, '#d8443a');
+      for (let i = -6; i < 6; i += 3) rect(i, -1, 1, 2, '#fff');
+    }
+    ctx.restore();
+  } else if (sp.kind === 'conveyor'){
+    ctx.save(); ctx.translate(x + .5, y + .5); ctx.rotate(rad); ctx.scale(s, s);
+    rect(-5, -3, 10, 6, '#3a3a44'); rect(-5, -3, 10, 1, '#5a5a66'); rect(-5, 2, 10, 1, '#2a2a30');
+    for (let i = 0; i < 4; i++){
+      const ax = ((t * 10 + i * 2.5) % 10) - 5;
+      rect(Math.round(ax) - 1, -1, 2, 2, '#ffd23f');
+    }
+    ctx.restore();
+  } else if (sp.kind === 'cannon'){
+    ctx.save(); ctx.translate(x + .5, y + .5); ctx.scale(s, s); ctx.rotate(rad);
+    rect(-4, 4, 11, 1, 'rgba(0,0,0,.25)');
+    rect(-5, -1, 4, 5, '#7a4a22'); rect(-5, -1, 4, 1, '#9a6a3a');
+    rect(-2, -3, 8, 5, '#3a3a44'); rect(-2, -3, 8, 1, '#5a5a66');
+    rect(5, -4, 3, 7, '#2a2a30'); rect(6, -3, 1, 1, '#6a6a76');
+    ctx.restore();
   } else if (sp.kind === 'randoleporter'){
     const cx2 = x + .5, cy2 = y + .5;
     rect(cx2 - 2, cy2 + 2, 5, 1, 'rgba(0,0,0,.25)');
@@ -3995,7 +4236,7 @@ function selectZoneAt(c){
   const i0 = c.y * W + c.x, t0 = terrain[i0];
   if (zoneGrid[i0]){ selectedObj = { cat:'zone', idx:zoneGrid[i0] - 1 }; syncUI(); return; }
   pushUndo();
-  zones.push({ kind:'zone', props:{} });
+  zones.push({ kind:'zone', props:{}, terrain:t0 });
   const id = zones.length, stack = [i0];
   let n = 0;
   while (stack.length){
@@ -4011,8 +4252,45 @@ function selectZoneAt(c){
   toast((TERRAINS.find(x => x.id === t0) || { name:'Terrain' }).name + ' zone: ' + n + ' cells');
   syncUI();
 }
+function updatePlates(){
+  for (const sp of specials){
+    if (sp.kind !== 'pressureplate') continue;
+    const cx = sp.x + .5, cy = sp.y + .5, R = 2.2 * (sp.scale || 1);
+    sp._down = !!(!ball.holed && ball.blackhole == null && Math.hypot(ball.x - cx, ball.y - cy) <= R);
+  }
+}
+function doorOpen(door){
+  return specials.some(p => p.kind === 'pressureplate' && p._down && p.props && p.props.linkId === door.uid);
+}
+function linkRow(o){
+  const row = el('div', { style:'margin-top:10px' });
+  const linked = o.props && o.props.linkId ? specials.find(z => z.kind === 'door' && z.uid === o.props.linkId) : null;
+  const status = linkMode === o ? 'Click a door to link it. Click this plate to cancel.'
+    : (linked ? 'Linked to a door.' : 'Not linked to a door yet.');
+  row.appendChild(el('div', { className:'note' }, status));
+  const lb = el('button', { className:'btn wide' + (linkMode === o ? ' on' : '') }, linkMode === o ? 'Cancel link' : 'Link to a door');
+  lb.onclick = () => { linkMode = (linkMode === o) ? null : o; syncUI(); };
+  row.appendChild(lb);
+  if (linked){
+    const ub = el('button', { className:'btn sm' }, 'Unlink');
+    ub.onclick = () => { delete o.props.linkId; changed = true; syncUI(); };
+    row.appendChild(ub);
+  }
+  return row;
+}
+function handleLinkClick(p){
+  const plate = linkMode;
+  const idx = findNearestGenerous('special', p);
+  if (idx < 0 || specials[idx] === plate){ linkMode = null; toast('Link cancelled'); syncUI(); return; }
+  const target = specials[idx];
+  if (target.kind !== 'door'){ toast('Click a door to link it'); return; }
+  plate.props = plate.props || {};
+  plate.props.linkId = target.uid;
+  linkMode = null; changed = true; toast('Plate linked to the door'); syncUI();
+}
 function stepBall(){
   if (ball.holed) return;
+  updatePlates();
   if (ball.sink > 0){ ball.sink++; if (ball.sink > 36 && !react) onHoleDone(); return; }
   if (ball.blackhole){ stepBlackholeOrbit(); return; }
   if (!ball.moving) return;
@@ -4147,6 +4425,7 @@ cv.addEventListener('pointerdown', e => {
   if (tool === 'tee' || tool === 'hole'){
     pushUndo(); dragging = { marker:tool }; placeMarker(tool, c); return;
   }
+  if (linkMode){ handleLinkClick(p); return; }
   if (editMode === 'select' && trySelectMarker(p)) return;
   if (editCat === 'terrain'){
     if (editMode === 'build'){
@@ -4275,6 +4554,11 @@ const SPECIAL_DEFS = [
   { kind:'randoleporter', name:'Randoleporter', title:'Teleports to a random other randoleporter on the hole', wide:true },
   { kind:'bouncewall', name:'Bounce wall', title:"Bounces the ball off in the direction it's rotated. Shape makes it longer" },
   { kind:'checkpoint', name:'Checkpoint', title:'Touching it moves your penalty respawn point forward' },
+  { kind:'pressureplate', name:'Pressure plate', title:'Stand on it to open the door it is linked to. Link it in Properties.' },
+  { kind:'door', name:'Door', title:'A barrier that stays shut until a linked pressure plate is pressed.' },
+  { kind:'timedgate', name:'Timed gate', title:'A gate that opens and closes on a timer. Closed, it bounces the ball back. Rotate with R.' },
+  { kind:'conveyor', name:'Conveyor', title:'A belt that pushes a rolling ball in the direction it points. Rotate with R.' },
+  { kind:'cannon', name:'Cannon', title:'Fires a ball out the way it points. Rotate with R. Power and arc are in Properties.' },
   { kind:'gravitater', name:'Gravitater', title:'Slams a midair ball straight down and forces putter for the rest of the hole', wide:true },
 ];
 SPECIAL_DEFS.forEach(d => {
@@ -4355,7 +4639,6 @@ function toggleClub(id){
 $('clubWoodBtn').onclick = () => toggleClub('driver');
 $('clubPutterBtn').onclick = () => toggleClub('putter');
 $('lockBtn').onclick = () => { courseLocked = !courseLocked; changed = true; syncUI(); };
-$('coursePackShopBtn').onclick = openShop;
 TERRAIN_IDS.forEach(id => $('texturePackSel').appendChild(el('option', { value:id }, PACK_DEFS[id].name)));
 $('texturePackSel').onchange = async e => {
   const v = e.target.value;

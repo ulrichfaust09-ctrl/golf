@@ -140,15 +140,16 @@ body{background-image:radial-gradient(circle, rgba(30,42,58,.12) 1px, transparen
 .cc-body{padding:12px}
 .cc-title{font-size:12px}
 /* ---------- intro ---------- */
-.intro{position:fixed;inset:0;z-index:100;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;background:var(--bg);transition:opacity .45s}
+.intro{position:fixed;inset:0;z-index:100;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;background:#08001e;transition:opacity .45s}
 .intro.gone{opacity:0;pointer-events:none}
 #introCv,#introLogo{width:min(600px,70vw,60vh);height:min(600px,70vw,60vh);image-rendering:pixelated}
-.intro-bar{width:min(420px,80vw);height:26px;border:4px solid var(--line);background:var(--panel);box-shadow:5px 5px 0 var(--line);padding:3px}
+.intro-bar{width:min(420px,80vw);height:26px;border:4px solid #3a2a6a;background:#1a0f3a;box-shadow:5px 5px 0 #3a2a6a;padding:3px}
 .intro-fill{height:100%;width:0;background:var(--accent)}
-.intro-stage{font-size:10px;color:var(--ink)}
+.intro-stage{font-size:10px;color:#e8e0ff}
 .intro-stage.ready{animation:introBlink 1s steps(2, start) infinite}
 @keyframes introBlink{to{visibility:hidden}}
-.intro-credit{position:absolute;bottom:22px;font-size:9px;color:var(--muted)}
+.intro-credit{position:absolute;bottom:22px;font-size:9px;color:#9a8ac0}
+img,canvas{image-rendering:pixelated}
 /* ---------- polish ---------- */
 .btn{transition:transform .08s, box-shadow .08s, background-color .15s}
 .btn:hover:not(:disabled){transform:translate(-1px,-1px)}
@@ -686,7 +687,10 @@ const PROP_SCHEMAS = {
   ],
   deco: [{ key:'flip', type:'bool', label:'Mirror sideways?', def:false }],
   pressureplate: [],
-  door: [],
+  door: [
+    { key:'temporary', type:'bool', label:'Temporary? (closes again)', def:true },
+    { key:'duration', type:'slider', min:1, max:30, step:0.5, def:3, label:'Duration of open (seconds)', showIf:'temporary' },
+  ],
   timedgate: [
     { key:'startOpen', type:'bool', label:'Starts open?', def:true },
     { key:'period', type:'slider', min:1, max:8, step:0.5, def:2.5, label:'Seconds open, then seconds closed' },
@@ -1082,7 +1086,7 @@ function buildBase(){
       else {
         const zid = zoneGrid[i], zsnow = !(zid && zones[zid-1] && zones[zid-1].props && zones[zid-1].props.snow === false);
         const snow = zsnow && hs[i] > 34;
-        c = snow ? (h > 210 ? C.snowL : h < 60 ? C.snowD : C.snow) : (h < 70 ? C.rockD : h > 200 ? C.rockL : C.rock);
+        c = snow ? (h > 210 ? C.snowL : h < 60 ? C.snowD : C.snow) : (h < 70 ? [84,86,92] : h > 200 ? [150,152,160] : [116,118,124]);
       }
     } else { // TREE
       if (!trAt(x, y-1)) c = C.rimTop;
@@ -1106,7 +1110,8 @@ function buildBase(){
       if ((x < W-1 && Math.floor(hs[i+1] / 4) !== q) || (y < H-1 && Math.floor(hs[i+W] / 4) !== q)) f *= 1.09;
     }
     let r = c[0]*f, g2 = c[1]*f, b = c[2]*f;
-    if (zoneGrid[i]){ r = r*0.8 + 150*0.2; g2 = g2*0.8 + 90*0.2; b = b*0.8 + 220*0.2; }
+    { const zd = zoneGrid[i] ? zones[zoneGrid[i]-1] : null;
+      if (zd && !(t === T.MOUNTAIN && zd.props && zd.props.snow === false)){ r = r*0.8 + 150*0.2; g2 = g2*0.8 + 90*0.2; b = b*0.8 + 220*0.2; } }
     if (heatMask && heatMask[i] && t !== T.WATER){ r = r*0.85 + 255*0.15; g2 = g2*0.92 + 110*0.08; b = b*0.9; }
     if (heat){
       const hv = hs[i], a = clamp(Math.abs(hv) / 24, 0, 0.55);
@@ -1848,6 +1853,7 @@ function renderProps(){
   $('propsInfo').textContent = 'Editing: ' + (def ? def.name : ({spin:'Spinner',slide:'Slider',pendulum:'Pendulum',popper:'Popper',zone:'Terrain zone',tee:'Tee / ball',deco:'Decoration'}[kind] || kind));
   body.innerHTML = '';
   schema.forEach(p => {
+    if (p.showIf && !getProp(o, p.showIf)) return;
     const row = el('div', { style:'margin-bottom:12px' });
     const syncLbl = el('label', { style:'display:flex;align-items:center;gap:6px;margin-top:6px;font-size:8px;color:var(--muted)' });
     const syncCheck = el('input', { type:'checkbox' });
@@ -1882,7 +1888,12 @@ function renderProps(){
     rs.oninput = e => { o.angle = +e.target.value; rl.textContent = 'Rotation: ' + e.target.value + ' deg'; changed = true; };
     body.append(rl, rs);
   }
-  if (kind === 'zone' && o.terrain === T.MOUNTAIN){
+  const zoneIsMountain = kind === 'zone' && (o.terrain === T.MOUNTAIN || (() => {
+    const id = zones.indexOf(o) + 1;
+    for (let i = 0; i < W*H; i++) if (zoneGrid[i] === id && terrain[i] === T.MOUNTAIN) return true;
+    return false;
+  })());
+  if (zoneIsMountain){
     o.props = o.props || {};
     const on = o.props.snow !== false;
     const sb = el('button', { className:'btn wide' + (on ? ' on' : '') }, 'Snowy peaks: ' + (on ? 'Yes' : 'No'));
@@ -3759,7 +3770,7 @@ function resetBall(){
   ball.x = tee.x + .5; ball.y = tee.y + .5; ball.vx = ball.vy = 0; ball.z = 0;
   ball.air = false; ball.sink = 0; ball.holed = false; ball.moving = false;
   ball.lx = ball.x; ball.ly = ball.y; ball.portalCd = 0; ball.padCd = 0; ball.blackhole = null; ball.onRail = null; ball.checkpoint = null; ball.lastTeleportRef = null;
-  forcedPutter = false; woodGrounded = false; specials.forEach(sp => { delete sp._uses; }); rails.forEach(r => { delete r._ridden; });
+  forcedPutter = false; woodGrounded = false; specials.forEach(sp => { delete sp._uses; delete sp._latched; delete sp._openUntil; }); rails.forEach(r => { delete r._ridden; });
   strokes = 0; aim = null; swing = null; react = null; parts.length = 0;
   $('result').classList.remove('show');
 }
@@ -4466,10 +4477,17 @@ function updatePlates(){
     if (sp.kind !== 'pressureplate') continue;
     const cx = sp.x + .5, cy = sp.y + .5, R = 2.2 * (sp.scale || 1);
     sp._down = !!(!ball.holed && ball.blackhole == null && Math.hypot(ball.x - cx, ball.y - cy) <= R);
+    if (sp._down){
+      for (const d of specials){
+        if (d.kind !== 'door' || !sp.props || sp.props.linkId !== d.uid) continue;
+        if (getProp(d, 'temporary')) d._openUntil = simTime + getProp(d, 'duration');
+        else d._latched = true;
+      }
+    }
   }
 }
 function doorOpen(door){
-  return specials.some(p => p.kind === 'pressureplate' && p._down && p.props && p.props.linkId === door.uid);
+  return !!door._latched || (door._openUntil !== undefined && simTime < door._openUntil);
 }
 function linkRow(o){
   const row = el('div', { style:'margin-top:10px' });
@@ -4508,10 +4526,11 @@ function stepWalk(){
     const ax = clamp(Math.round(cx + dx * 2), 0, W-1), ay = clamp(Math.round(cy + dy * 2), 0, H-1);
     const dh = elev[ay*W + ax] - elev[cy*W + cx];
     const climb = clamp(1 - dh * 0.12, 0.3, 1.6);
-    const target = WALK_SPEED * climb;
-    ball.vx += (dx * target - ball.vx) * 0.4; ball.vy += (dy * target - ball.vy) * 0.4;
+    const accel = 0.08 * climb;
+    ball.vx += dx * accel; ball.vy += dy * accel;
     if (ix) ball.facing = ix > 0 ? 1 : -1;
-  } else { ball.vx *= 0.5; ball.vy *= 0.5; }
+    ball.vx *= 0.88; ball.vy *= 0.88;
+  } else { ball.vx *= 0.75; ball.vy *= 0.75; }
   ball.moving = true;
   if (moveBall(Math.max(1, Math.ceil(Math.hypot(ball.vx, ball.vy))), false)) return;
   checkHazards(); checkPortals(); checkRails(); checkSpecials();
@@ -4520,7 +4539,7 @@ function stepBall(){
   if (ball.holed) return;
   updatePlates();
   if (ball.sink > 0){ ball.sink++; if (ball.sink > 36 && !react) onHoleDone(); return; }
-  if (walkMode && !ball.blackhole){ stepWalk(); return; }
+  if (walkMode && !ball.blackhole && !ball.air){ stepWalk(); return; }
   if (ball.blackhole){ stepBlackholeOrbit(); return; }
   if (!ball.moving) return;
   if (ball.air){

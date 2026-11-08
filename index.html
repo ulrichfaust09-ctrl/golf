@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Pixel Links – Golf Course Maker</title>
-<link rel="icon" type="image/png" href="icon.png">
+<link rel="icon" href="icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
@@ -127,6 +127,56 @@ input[type=range]{width:100%;accent-color:var(--accent);margin:4px 0 0}
 .meter{height:16px;border:3px solid var(--line);background:var(--bg);margin-bottom:8px}
 .meter div{height:100%;width:0;background:var(--good)}
 
+/* ---------- menu look ---------- */
+body{background-image:radial-gradient(circle, rgba(30,42,58,.12) 1px, transparent 1.5px);background-size:12px 12px}
+.hero{margin-bottom:26px}
+.hero canvas{box-shadow:8px 8px 0 var(--line)}
+.hero-text{background:var(--panel);box-shadow:5px 5px 0 var(--line);padding:12px 16px}
+.hero-text h1{font-size:20px;letter-spacing:.5px;text-shadow:2px 2px 0 rgba(0,0,0,.12)}
+.menu-bar{padding:10px 12px;background:var(--panel);border:3px solid var(--line);box-shadow:4px 4px 0 var(--line);margin-bottom:18px}
+.menu-bar .btn{box-shadow:3px 3px 0 var(--line)}
+.cc{background:linear-gradient(180deg, var(--panel), var(--bg))}
+.cc .thumb{border-bottom:4px solid var(--line);box-shadow:inset 0 -8px 0 rgba(0,0,0,.18)}
+.cc-body{padding:12px}
+.cc-title{font-size:12px}
+/* ---------- intro ---------- */
+.intro{position:fixed;inset:0;z-index:100;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;background:var(--bg);transition:opacity .45s}
+.intro.gone{opacity:0;pointer-events:none}
+#introCv,#introLogo{width:min(600px,70vw,60vh);height:min(600px,70vw,60vh);image-rendering:pixelated}
+.intro-bar{width:min(420px,80vw);height:26px;border:4px solid var(--line);background:var(--panel);box-shadow:5px 5px 0 var(--line);padding:3px}
+.intro-fill{height:100%;width:0;background:var(--accent)}
+.intro-stage{font-size:10px;color:var(--ink)}
+.intro-stage.ready{animation:introBlink 1s steps(2, start) infinite}
+@keyframes introBlink{to{visibility:hidden}}
+.intro-credit{position:absolute;bottom:22px;font-size:9px;color:var(--muted)}
+/* ---------- polish ---------- */
+.btn{transition:transform .08s, box-shadow .08s, background-color .15s}
+.btn:hover:not(:disabled){transform:translate(-1px,-1px)}
+.btn:active:not(:disabled){transform:translate(2px,2px)}
+.cc{transition:transform .12s}
+.cc:hover{transform:translateY(-3px)}
+.card{transition:transform .12s}
+.card:hover{transform:translateY(-2px)}
+:focus-visible{outline:3px solid #ffd23f;outline-offset:2px}
+/* ---------- shop ---------- */
+.shopdlg{max-width:940px;width:min(940px,96vw)}
+.shophead{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+.shopstats{display:flex;gap:14px;margin-bottom:14px}
+.stat{border:3px solid var(--line);padding:8px 14px;background:var(--bg)}
+.statv{font-size:14px}
+.shopgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px}
+.card{border:4px solid var(--line);background:var(--bg);padding:12px;display:flex;flex-direction:column;gap:8px}
+.card.wide{grid-column:span 2}
+.card h3{margin:0;font-size:11px}
+.card p{margin:0}
+.swatch{height:14px;border:3px solid var(--line)}
+.reel{position:relative;overflow:hidden;height:70px;border:4px solid var(--line);background:var(--panel)}
+.reel .strip{position:absolute;top:0;left:0;display:flex;height:100%}
+.reel .item{width:120px;flex:none;height:100%;display:flex;align-items:center;justify-content:center;font-size:9px;text-align:center;border-right:2px solid var(--line)}
+.reel .pointer{position:absolute;left:50%;top:0;bottom:0;width:4px;margin-left:-2px;background:#e0392b}
+.tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px}
+.tile{border:3px solid var(--line);padding:6px;font-size:8px;background:var(--bg);opacity:.5}
+.tile.owned{opacity:1}
 /* ---------- profiles ---------- */
 img.pxi{width:20px;height:20px;vertical-align:middle;margin-right:6px;image-rendering:pixelated;display:inline-block}
 .mailBtn{position:relative}
@@ -175,6 +225,13 @@ details.panel[open] summary{margin-bottom:12px}
 </style>
 </head>
 <body>
+<div id="intro" class="intro">
+  <img id="introLogo" src="blackhole.png" alt="" width="200" height="200" onerror="document.getElementById('introCv').style.display='block';this.style.display='none'">
+  <canvas id="introCv" width="64" height="64" aria-hidden="true" style="display:none"></canvas>
+  <div class="intro-bar"><div class="intro-fill" id="introFill"></div></div>
+  <div class="intro-stage" id="introStage">Loading Game..</div>
+  <div class="intro-credit">Provided by Orange</div>
+</div>
 <div class="app">
 
   <!-- ================= MENU ================= -->
@@ -188,6 +245,7 @@ details.panel[open] summary{margin-bottom:12px}
         <button class="btn" id="tabCommunity">Community</button>
         <button class="btn" id="tabDevice">On this device</button>
         <button class="btn" id="tabChains">Multi course</button>
+        <input class="text" id="courseSearch" placeholder="Search courses, or (username)" style="margin-bottom:0;width:260px">
         <select class="text" id="commSort" style="margin-bottom:0;width:auto">
           <option value="new">Sort: Newest</option>
           <option value="rating">Sort: Highest rated</option>
@@ -352,6 +410,13 @@ details.panel[open] summary{margin-bottom:12px}
           </div>
 
           <div class="panel">
+            <h2>Walk mode (this course)</h2>
+            <select class="text" id="walkSel" aria-label="Walk mode">
+              <option value="off">Off: normal shots</option>
+              <option value="optional">Optional: players choose</option>
+              <option value="forced">Forced: walk only</option>
+            </select>
+            <p class="note">Forced: everyone plays this course as the walking golfer. No shots.</p>
             <h2>Texture pack (this course)</h2>
             <select class="text" id="texturePackSel" aria-label="Texture pack">
               <option value="none">None</option>
@@ -371,6 +436,7 @@ details.panel[open] summary{margin-bottom:12px}
         </div>
 
         <div id="playPanel" hidden>
+          <button class="btn wide" id="walkBtn">Walk mode: off</button>
           <div class="panel">
             <h2>Now playing</h2>
             <div class="course-title" id="pName"></div>
@@ -543,6 +609,20 @@ let editCat = 'terrain', editMode = 'build', terrainStyle = 'paint';
 let selectedObj = null; // { cat:'deco'|'hazard'|'portal'|'special', idx }
 let rotating = false;
 let linkMode = null;
+let walkMode = false;
+let courseWalk = 'off';
+const walkKeys = { w:false, a:false, s:false, d:false };
+const WALK_SPEED = 0.55;
+const WALK_MAP = { w:'w', a:'a', s:'s', d:'d', arrowup:'w', arrowleft:'a', arrowdown:'s', arrowright:'d' };
+window.addEventListener('keydown', e => {
+  const k = WALK_MAP[(e.key || '').toLowerCase()];
+  if (!k || !walkMode) return;
+  const t = e.target && e.target.tagName;
+  if (t === 'INPUT' || t === 'TEXTAREA' || t === 'SELECT') return;
+  walkKeys[k] = true; e.preventDefault();
+});
+window.addEventListener('keyup', e => { const k = WALK_MAP[(e.key || '').toLowerCase()]; if (k) walkKeys[k] = false; });
+window.addEventListener('blur', () => { walkKeys.w = walkKeys.a = walkKeys.s = walkKeys.d = false; });
 let courseLocked = false, allowedClubs = ['driver', 'putter'], autoExcluded = [];
 let forcedPutter = false, woodGrounded = false;
 const HAZ_PERIOD = { 1:4.4, 2:3.2, 3:2.2, 4:1.5, 5:1.0 };
@@ -575,7 +655,7 @@ const ZONE_PROPS = [
 const PROP_SCHEMAS = {
   tee: TEE_PROPS,
   zone: ZONE_PROPS,
-  spin: HAZ_PROPS,
+  spin: HAZ_PROPS.concat([{ key:'clockwise', type:'bool', label:'Clockwise?', def:true }]),
   slide: HAZ_PROPS,
   pendulum: HAZ_PROPS.concat([{ key:'swing', type:'slider', min:20, max:170, step:5, def:60, label:'Swing arc (degrees)' }]),
   popper: HAZ_PROPS.concat([{ key:'duty', type:'slider', min:10, max:90, step:5, def:40, label:'Time up (%)' }]),
@@ -604,15 +684,19 @@ const PROP_SCHEMAS = {
     { key:'eventHorizon', type:'bool', label:'Event Horizon? (circles before being eaten even on a direct hit)', def:false },
     { key:'orbitTime', type:'slider', min:0.5, max:10, step:0.5, def:2, label:'Time before leaving (s)' },
   ],
+  deco: [{ key:'flip', type:'bool', label:'Mirror sideways?', def:false }],
   pressureplate: [],
   door: [],
   timedgate: [
+    { key:'startOpen', type:'bool', label:'Starts open?', def:true },
     { key:'period', type:'slider', min:1, max:8, step:0.5, def:2.5, label:'Seconds open, then seconds closed' },
   ],
   conveyor: [
+    { key:'maxSpeed', type:'slider', min:1, max:10, step:0.5, def:4, label:'Top speed (no push above this)' },
     { key:'strength', type:'slider', min:25, max:400, step:5, def:100, label:'Push strength %' },
   ],
   cannon: [
+    { key:'cooldown', type:'slider', min:5, max:120, step:5, def:30, label:'Cooldown (frames before it fires again)' },
     { key:'power', type:'slider', min:50, max:400, step:5, def:150, label:'Power % (launch speed)' },
     { key:'arc', type:'bool', label:'Arc through the air? (off = rolls out)', def:true },
   ],
@@ -1074,9 +1158,9 @@ function drawBallAt(bx, by, z, s){
 
 /* ---- decorations (each anchored at its base point x,y) ---- */
 function drawDeco(d, now){
-  const s = d.scale || 1;
-  if (s === 1){ drawDecoRaw(d, now); return; }
-  ctx.save(); ctx.translate(d.x, d.y); ctx.scale(s, s); ctx.translate(-d.x, -d.y);
+  const s = d.scale || 1, ang = (d.angle || 0) * Math.PI / 180, fl = (d.props && d.props.flip) ? -1 : 1;
+  if (s === 1 && !ang && fl === 1){ drawDecoRaw(d, now); return; }
+  ctx.save(); ctx.translate(d.x, d.y); ctx.rotate(ang); ctx.scale(s * fl, s); ctx.translate(-d.x, -d.y);
   drawDecoRaw(d, now);
   ctx.restore();
 }
@@ -1322,25 +1406,32 @@ let golferSkin = 'classic';
 function drawDude(o){
   const P = GOLF_SKINS[golferSkin] || GOLF_SKINS.classic;
   const f = o.f, gx = o.gx, jy = o.jy || 0, y = o.gy + jy, skin = o.skin || '#f0c8a0';
+  const astro = golferSkin === 'astro';
   rect(gx - 2, o.gy, 5, 1, 'rgba(0,0,0,.3)');
   const lh = o.slump ? 2 : 3, top = y - lh - 3;
+  if (astro){ rect(gx - 2 - f, top, 1, 4, '#9aa6b8'); rect(gx - 2 - f, top + 1, 1, 2, '#5a6478'); }
   rect(gx - 1, y - lh, 1, lh, P.pants); rect(gx + 1, y - lh, 1, lh, P.pants);
   rect(gx - 1, top, 3, 3, P.shirt);
+  if (astro){ rect(gx - 1, top + 1, 3, 1, '#c3ccd8'); rect(gx, top + 1, 1, 1, '#e0453a'); rect(gx + 1, top + 2, 1, 1, '#2f80c8'); }
   const hy = top - 3 + (o.headDy || 0), hx = gx - 1 + (o.hx || 0);
-  rect(hx, hy, 3, 3, skin); rect(hx, hy, 3, 1, P.cap); rect(hx + (f > 0 ? 3 : -1), hy + 1, 1, 1, '#ffffff');
+  if (astro){
+    rect(hx - 1, hy - 1, 5, 5, '#e8ecf2');
+    rect(hx - 1, hy - 1, 5, 1, '#c3ccd8');
+    rect(hx + (f > 0 ? 1 : -1), hy, 3, 2, '#1e3a5f');
+    rect(hx + (f > 0 ? 2 : -1), hy, 1, 1, '#7fd1ff');
+  } else {
+    rect(hx, hy, 3, 3, skin); rect(hx, hy, 3, 1, P.cap); rect(hx + (f > 0 ? 3 : -1), hy + 1, 1, 1, '#ffffff');
+  }
   if (o.armsUp){
     const at = hy - 2;
-    rect(gx - 2, at, 1, top + 2 - at, skin); rect(gx + 2, at, 1, top + 2 - at, skin);
+    rect(gx - 2, at, 1, top + 2 - at, astro ? '#e8ecf2' : skin); rect(gx + 2, at, 1, top + 2 - at, astro ? '#e8ecf2' : skin);
     rect(gx + 2, at - 5, 1, 5, '#e6e6ea'); rect(gx + 2, at - 6, 2, 1, P.club);
   } else {
     const hx2 = gx + f, hy2 = top + 1, dx = f * Math.sin(o.phi), dy = Math.cos(o.phi);
-    if (P.trail && o.phi !== undefined){
-      for (let k = 1; k <= 4; k++){
-        const a = o.phi + k * 0.22;
-        rect(Math.round(hx2 + f * Math.sin(a) * 8), Math.round(hy2 + Math.cos(a) * 8), 1, 1, P.trail);
-      }
+    if (P.trail){
+      for (let k = 1; k <= 3; k++) rect(hx2 - f * (2 + k) + (k % 2 ? 0 : 1), hy2 - k, 1, 1, P.trail);
     }
-    rect(hx2, hy2, 1, 1, skin);
+    rect(hx2, hy2, 1, 1, astro ? '#e8ecf2' : skin);
     for (let sp = 1; sp <= 7; sp++) rect(Math.round(hx2 + dx * sp), Math.round(hy2 + dy * sp), 1, 1, '#e6e6ea');
     rect(Math.round(hx2 + dx * 8), Math.round(hy2 + dy * 8), 2, 1, P.club);
   }
@@ -1479,9 +1570,12 @@ function render(now){
         bx = ball.x + (hole.x + .5 - ball.x)*k; by = ball.y + (hole.y + .5 - ball.y)*k;
         s = ball.sink > 8 ? 0 : 0.5;
       }
-      drawBallAt(bx, by, ball.z, s);
+      if (walkMode){
+        const bob = (Math.hypot(ball.vx, ball.vy) > 0.05 && Math.sin(simTime * 14) > 0) ? -1 : 0;
+        drawDude({ gx: Math.floor(bx), gy: Math.floor(by) + 1 + bob, f: ball.facing || 1, phi: 0.6, hx: 0 });
+      } else drawBallAt(bx, by, ball.z, s);
     }
-    drawGolfer(now);
+    if (!walkMode) drawGolfer(now);
     for (const d of below) drawDeco(d, now);
     drawRails(); drawHazards(simTime); drawPortals(simTime); drawSpecials(simTime);
     if (hole) drawFlag(hole, now);
@@ -1746,12 +1840,12 @@ function renderProps(){
   const panel = $('propsPanel'), body = $('propsBody');
   if (!selectedObj){ panel.hidden = true; return; }
   const arr = catArr(selectedObj.cat), o = arr && arr[selectedObj.idx];
-  const kind = selectedObj.cat === 'rail' ? 'rail' : (o && o.kind);
+  const kind = selectedObj.cat === 'rail' ? 'rail' : selectedObj.cat === 'deco' ? 'deco' : (o && o.kind);
   const schema = kind && PROP_SCHEMAS[kind];
   if (!o || !schema){ panel.hidden = true; return; }
   panel.hidden = false;
   const def = SPECIAL_DEFS.find(d => d.kind === kind);
-  $('propsInfo').textContent = 'Editing: ' + (def ? def.name : ({spin:'Spinner',slide:'Slider',pendulum:'Pendulum',popper:'Popper',zone:'Terrain zone',tee:'Tee / ball'}[kind] || kind));
+  $('propsInfo').textContent = 'Editing: ' + (def ? def.name : ({spin:'Spinner',slide:'Slider',pendulum:'Pendulum',popper:'Popper',zone:'Terrain zone',tee:'Tee / ball',deco:'Decoration'}[kind] || kind));
   body.innerHTML = '';
   schema.forEach(p => {
     const row = el('div', { style:'margin-bottom:12px' });
@@ -1781,6 +1875,13 @@ function renderProps(){
     }
     body.appendChild(row);
   });
+  if (o.angle !== undefined || kind === 'deco' || (kind && (HAZ_KINDS.includes(kind) || SPECIAL_KINDS.includes(kind)))){
+    const cur0 = Math.round(((o.angle || 0) % 360 + 360) % 360);
+    const rl = el('div', { className:'note' }, 'Rotation: ' + cur0 + ' deg');
+    const rs = el('input', { type:'range', min:0, max:359, step:1, value:cur0 });
+    rs.oninput = e => { o.angle = +e.target.value; rl.textContent = 'Rotation: ' + e.target.value + ' deg'; changed = true; };
+    body.append(rl, rs);
+  }
   if (kind === 'zone' && o.terrain === T.MOUNTAIN){
     o.props = o.props || {};
     const on = o.props.snow !== false;
@@ -1791,7 +1892,7 @@ function renderProps(){
   if (kind === 'pressureplate') body.appendChild(linkRow(o));
 }
 function newCourse(name, fill){
-  activePack = 'none';
+  activePack = 'none'; courseWalk = 'off'; walkMode = false;
   holes = [blankHole(fill)]; loadHoleIntoActive(0);
   courseName = name || 'My course'; changed = false; round = null; chainBounds = null;
   courseLocked = false; allowedClubs = ['driver', 'putter']; autoExcluded = []; selectedObj = null; editMode = 'build'; editCat = 'terrain'; tool = null;
@@ -1885,9 +1986,9 @@ function rleDec(r, Ty, lo, hi){
 function serialize(){
   commitHole();
   return {
-    v:4, name:courseName, w:W, h:H, texturePack:activePack, locked:courseLocked, clubs:allowedClubs, autoEx:autoExcluded,
+    v:4, name:courseName, w:W, h:H, walk:courseWalk, texturePack:activePack, locked:courseLocked, clubs:allowedClubs, autoEx:autoExcluded,
     holes: holes.map(h => ({
-      tee:h.tee, hole:h.hole, rle:rleEnc(h.terrain), erle:rleEnc(h.elev), decos:h.decos.map(d => [d.t, d.x, d.y, Math.round((d.scale || 1) * 20)]),
+      tee:h.tee, hole:h.hole, rle:rleEnc(h.terrain), erle:rleEnc(h.elev), decos:h.decos.map(d => [d.t, d.x, d.y, Math.round((d.scale || 1) * 20), Math.round(d.angle || 0), d.props || {}]),
       hz:(h.hazards || []).map(z => [HAZ_KINDS.indexOf(z.kind), z.x, z.y, Math.round(z.len), Math.round(z.period * 10), Math.round(z.phase * 100), Math.round(z.angle || 0), z.props || {}]),
       pt:(h.portals || []).map(p => [p.color, p.x, p.y, Math.round((p.scale || 1) * 20), p.props || {}]),
       sp:(h.specials || []).map(z => [SPECIAL_KINDS.indexOf(z.kind), z.x, z.y, Math.round(z.angle || 0), Math.round((z.scale || 1) * 20), Math.round(z.len || 10), z.props || {}, z.uid || 0]),
@@ -1912,7 +2013,7 @@ function parseHoles(o, cap = MAX_HOLES){
     const e = Array.isArray(hd.erle) ? rleDec(hd.erle, Int8Array, -HMAX, HMAX) : new Int8Array(W*H);
     const ds = [];
     if (Array.isArray(hd.decos)) for (const a of hd.decos.slice(0, MAX_DECOS)){
-      if (Array.isArray(a) && Number.isInteger(a[0]) && a[0] >= 0 && a[0] < DECOS.length && Number.isFinite(a[1]) && Number.isFinite(a[2])) ds.push({ t:a[0], x:clamp(a[1]|0, 0, W-1), y:clamp(a[2]|0, 0, H-1), scale:clamp((Number(a[3]) || 20) / 20, 0.4, 4) });
+      if (Array.isArray(a) && Number.isInteger(a[0]) && a[0] >= 0 && a[0] < DECOS.length && Number.isFinite(a[1]) && Number.isFinite(a[2])) ds.push({ t:a[0], x:clamp(a[1]|0, 0, W-1), y:clamp(a[2]|0, 0, H-1), scale:clamp((Number(a[3]) || 20) / 20, 0.4, 4), angle:Number.isFinite(a[4]) ? ((a[4] % 360) + 360) % 360 : 0, props:(a[5] && typeof a[5] === 'object' && !Array.isArray(a[5])) ? a[5] : {} });
     }
     const zs = [];
     if (Array.isArray(hd.hz)) for (const a of hd.hz.slice(0, MAX_HAZARDS)){
@@ -1964,6 +2065,8 @@ function applyData(o){
   holes = parseHoles(o);
   courseName = String(o.name || 'My course').slice(0, 20);
   activePack = TERRAIN_IDS.includes(o.texturePack) ? o.texturePack : 'none'; dirty = true;
+  courseWalk = ['off','optional','forced'].includes(o.walk) ? o.walk : 'off';
+  walkMode = courseWalk === 'forced';
   courseLocked = !!o.locked;
   allowedClubs = Array.isArray(o.clubs) ? o.clubs.filter(c => c === 'driver' || c === 'putter') : ['driver', 'putter'];
   if (!allowedClubs.length) allowedClubs = ['driver', 'putter'];
@@ -2424,6 +2527,13 @@ async function runConsole(raw){
     return;
   }
   if (cmd === '/random'){ randomCourse(); return; }
+  if (cmd === '/walk'){
+    if (courseWalk === 'forced'){ consoleSay('This course is walk only'); return; }
+    walkMode = !walkMode; walkKeys.w = walkKeys.a = walkKeys.s = walkKeys.d = false;
+    $('walkBtn').textContent = 'Walk mode: ' + (walkMode ? 'on' : 'off');
+    consoleSay('Walk mode ' + (walkMode ? 'on' : 'off'));
+    return;
+  }
   consoleSay('Unknown command. Type /help');
 }
 window.addEventListener('keydown', e => {
@@ -2586,11 +2696,11 @@ function applyRoll(w, rnd = Math.random){
   let x = rnd() * 100, pick = ROLL_TABLE[ROLL_TABLE.length - 1];
   for (const row of ROLL_TABLE){ if (x < row[0]){ pick = row; break; } x -= row[0]; }
   const kind = pick[1], val = pick[2];
-  if (kind === 's'){ w.shards += val; return { ok:true, msg:'Pack: +' + val + ' shards' }; }
+  if (kind === 's'){ w.shards += val; return { ok:true, msg:'Pack: +' + val + ' shards', label: val + ' shards' }; }
   if (kind === 'pack'){
-    if (w.packs[val]){ w.shards += DUP_PACK_SHARDS; return { ok:true, msg:'Already own ' + PACK_DEFS[val].name + ': converted to ' + DUP_PACK_SHARDS + ' shards' }; }
+    if (w.packs[val]){ w.shards += DUP_PACK_SHARDS; return { ok:true, msg:'Already own ' + PACK_DEFS[val].name + ': converted to ' + DUP_PACK_SHARDS + ' shards', label: PACK_DEFS[val].name + ' pack' }; }
     w.packs[val] = true;
-    return { ok:true, msg:'Pack: ' + PACK_DEFS[val].name + ' texture pack unlocked!' };
+    return { ok:true, msg:'Pack: ' + PACK_DEFS[val].name + ' texture pack unlocked!', label: PACK_DEFS[val].name + ' pack' };
   }
   // decor pack: three different random items; any already owned pays shards
   w.shards += DECOR_PACK_SHARDS;
@@ -2601,7 +2711,7 @@ function applyRoll(w, rnd = Math.random){
     if (w.decor[key]){ w.shards += DUP_DECOR_SHARDS; w.decor[key] += 1; got.push(DECO_PACK_NAMES[key] + ' (already owned, +' + DUP_DECOR_SHARDS + ')'); }
     else { w.decor[key] = 1; got.push(DECO_PACK_NAMES[key] + ' (new)'); }
   }
-  return { ok:true, msg:'Decor pack: ' + got.join(', ') + ' + ' + DECOR_PACK_SHARDS + ' shards' };
+  return { ok:true, msg:'Decor pack: ' + got.join(', ') + ' + ' + DECOR_PACK_SHARDS + ' shards', label:'Decor pack' };
 }
 function applyWear(w, id){
   if (id !== 'classic' && !(w.packs && w.packs[id])) return { ok:false, msg:'Buy that golfer first' };
@@ -2684,90 +2794,176 @@ const buyTx = (id, cur) => walletTx(w => applyBuy(w, id, cur));
 const wearTx = id => walletTx(w => applyWear(w, id));
 
 /* ---- the shop window ---- */
+const REEL_LABELS = ['10 shards', '16 shards', '24 shards', '36 shards', 'Decor pack', 'Aqua pack', 'Volcanic pack', '120 shards'];
+const REEL_ITEM = 120;
+const SHOP_COLORS = { aqua:'#3fa0c8', volcanic:'#e0572a', night:'#2a3a7a', autumn:'#c26a2a', candy:'#f08ac0', winter:'#bfe6f5', camping:'#6a8a3a', pro:'#f4f4f6', neon:'#ff4fd8', tweed:'#b5814a', astro:'#e8ecf2' };
+let shopRolling = false, reelCtl = null;
+
+function makeReel(){
+  const wrap = el('div', { className:'reel' });
+  const strip = el('div', { className:'strip' });
+  for (let r = 0; r < 12; r++) REEL_LABELS.forEach(l => strip.appendChild(el('div', { className:'item' }, l)));
+  wrap.append(strip, el('div', { className:'pointer' }));
+  return { wrap, strip, pos:0, vel:0, mode:'idle', target:0, onDone:null };
+}
+function paintReel(c){
+  const cw = c.wrap.clientWidth || 600;
+  c.strip.style.transform = 'translateX(' + (cw / 2 - REEL_ITEM / 2 - c.pos) + 'px)';
+}
+function reelFrame(){
+  const c = reelCtl;
+  if (!c) return;
+  if (c.mode === 'spin'){ c.vel = Math.min(c.vel + 0.8, 38); c.pos += c.vel; }
+  else if (c.mode === 'land'){
+    const d = c.target - c.pos;
+    c.pos += d * 0.05 + Math.sign(d) * 0.6;
+    if (Math.abs(d) < 0.6){ c.pos = c.target; c.mode = 'done'; if (c.onDone) c.onDone(); }
+  }
+  const span = REEL_LABELS.length * REEL_ITEM;
+  if (c.pos > span * 6){ c.pos -= span * 4; c.target -= span * 4; }
+  paintReel(c);
+  if (c.mode !== 'done') requestAnimationFrame(reelFrame);
+}
+function landReel(label){
+  return new Promise(res => {
+    const c = reelCtl;
+    if (!c){ res(); return; }
+    let k = Math.floor(c.pos / REEL_ITEM) + 24;
+    while (REEL_LABELS[k % REEL_LABELS.length] !== label) k++;
+    c.target = k * REEL_ITEM;
+    c.onDone = res;
+    c.mode = 'land';
+  });
+}
+async function doRoll(reel, say){
+  if (shopRolling) return;
+  shopRolling = true; reelCtl = reel; reel.mode = 'spin'; reel.vel = 0;
+  requestAnimationFrame(reelFrame);
+  const t0 = Date.now();
+  const r = await rollTx();
+  if (!r.ok){ reel.mode = 'idle'; reelCtl = null; shopRolling = false; say(r); renderShop(); return; }
+  await new Promise(res => setTimeout(res, Math.max(0, 1800 - (Date.now() - t0))));
+  await landReel(r.label);
+  reelCtl = null; shopRolling = false;
+  say(r); renderShop();
+}
+function shopStat(label, value){
+  const d = el('div', { className:'stat' });
+  d.append(el('div', { className:'muted' }, label), el('div', { className:'statv' }, String(value)));
+  return d;
+}
+function shopCard(title, blurb, color, footer){
+  const c = el('div', { className:'card' });
+  const sw = el('div', { className:'swatch' });
+  sw.style.background = color || '#7fd1a0';
+  c.append(sw, el('h3', {}, title), el('p', { className:'muted' }, blurb || ''));
+  if (footer) c.appendChild(footer);
+  return c;
+}
 function renderShop(){
-  if (!shopBox || !shopBox.isConnected) return;
+  if (!shopBox || !shopBox.isConnected || shopRolling) return;
   shopBox.innerHTML = '';
   if (!user){ shopBox.appendChild(el('p', { className:'muted' }, 'Sign in to get tokens and shards.')); return; }
   if (!wallet){ shopBox.appendChild(el('p', { className:'muted' }, 'Loading your wallet...')); return; }
   const w = wallet, k = dayKey();
   const msg = el('div', { className:'muted' }, lastShopMsg);
   const say = r => { lastShopMsg = r.msg; msg.textContent = r.msg; };
-  shopBox.appendChild(el('p', { style:'margin:0 0 12px;font-size:11px' }, w.tokens + ' tokens  ·  ' + fmtSh(w.shards) + ' shards'));
 
+  const top = el('div', { className:'shopstats' });
+  top.append(shopStat('Tokens', w.tokens), shopStat('Shards', fmtSh(w.shards)));
+  shopBox.appendChild(top);
+
+  const grid = el('div', { className:'shopgrid' });
+
+  // open a pack: the spinner lands on what you got
+  const rollCard = el('div', { className:'card wide' });
+  rollCard.appendChild(el('h3', {}, 'Open a pack (' + ROLL_COST + ' tokens)'));
+  const reel = makeReel();
+  rollCard.appendChild(reel.wrap);
+  requestAnimationFrame(() => paintReel(reel));
+  const rBtn = el('button', { className:'btn wide primary' }, 'Spin');
+  rBtn.disabled = w.tokens < ROLL_COST;
+  rBtn.onclick = () => doRoll(reel, say);
+  rollCard.appendChild(rBtn);
+  rollCard.appendChild(el('p', { className:'muted' }, 'Odds: 10 shards 37.5% · 16 shards 20% · 24 shards 17.5% · 36 shards 10% · decor pack 7.25% · Aqua 4.75% · Volcanic 2.25% · 120 shards 0.75%'));
+  grid.appendChild(rollCard);
+
+  // daily and trade
+  const tradeCard = el('div', { className:'card' });
   const dailyDone = w.dailyKey >= k;
-  const daily = el('button', { className:'btn wide' }, dailyDone ? 'Daily tokens: claimed today' : 'Claim ' + DAILY_TOKENS + ' daily tokens');
+  const daily = el('button', { className:'btn wide' }, dailyDone ? 'Daily tokens: claimed' : 'Claim ' + DAILY_TOKENS + ' daily tokens');
   daily.disabled = dailyDone;
   daily.onclick = async () => say(await dailyTx());
-  shopBox.appendChild(daily);
-
   const left = Math.max(0, TRADE_CAP - (w.tradeDay === k ? w.tradedToday : 0));
-  const tIn = el('input', { type:'number', min:1, step:1, value:1, className:'text', style:'width:90px' });
-  const tBtn = el('button', { className:'btn' }, 'Trade tokens for shards');
+  const tIn = el('input', { type:'number', min:1, step:1, value:1, className:'text', style:'width:80px' });
+  const tBtn = el('button', { className:'btn' }, 'Trade');
   tBtn.onclick = async () => say(await tradeTx(parseInt(tIn.value, 10)));
-  const tRow = el('div', { style:'display:flex;gap:10px;align-items:center;flex-wrap:wrap' });
+  const tRow = el('div', { style:'display:flex;gap:8px;align-items:center;flex-wrap:wrap' });
   tRow.append(tIn, tBtn);
-  shopBox.append(el('p', { className:'muted' }, '1 token = 1.5 shards. ' + fmtSh(left) + ' shards left to buy today.'), tRow);
+  tradeCard.append(el('h3', {}, 'Tokens and shards'), daily, el('p', { className:'muted' }, '1 token = 1.5 shards. ' + fmtSh(left) + ' shards left to buy today.'), tRow);
+  grid.appendChild(tradeCard);
 
-  const rBtn = el('button', { className:'btn wide primary' }, 'Open a pack (' + ROLL_COST + ' tokens)');
-  rBtn.disabled = w.tokens < ROLL_COST;
-  rBtn.onclick = async () => say(await rollTx());
-  shopBox.append(rBtn, el('p', { className:'muted' }, 'Odds: 10 shards 37.5% · 16 shards 20% · 24 shards 17.5% · 36 shards 10% · decor pack + 50 shards 7.25% · Aqua 4.75% · Volcanic 2.25% · 120 shards 0.75%'));
-
-  shopBox.appendChild(el('h2', {}, 'Texture packs'));
+  // texture packs, golfers and camping as cards
   TERRAIN_IDS.concat(['camping']).forEach(id => {
     const d = PACK_DEFS[id], owned = !!w.packs[id];
-    const row = el('div', { className:'review' });
-    row.appendChild(el('div', { className:'rh' }, d.name + (owned ? '  · owned' : '')));
-    row.appendChild(el('div', { className:'rt' }, d.blurb));
-    if (!owned){
-      const bt = el('button', { className:'btn sm' }, 'Buy ' + d.tk + ' tokens');
+    const foot = el('div', { style:'display:flex;gap:6px;flex-wrap:wrap' });
+    if (owned) foot.appendChild(el('span', { className:'muted' }, 'Owned'));
+    else {
+      const bt = el('button', { className:'btn sm' }, d.tk + ' tk');
       bt.onclick = async () => say(await buyTx(id, 'tk'));
-      const bs = el('button', { className:'btn sm' }, 'Buy ' + d.sh + ' shards');
+      const bs = el('button', { className:'btn sm' }, d.sh + ' sh');
       bs.onclick = async () => say(await buyTx(id, 'sh'));
-      const brow = el('div', { style:'margin-top:8px;display:flex;gap:8px;flex-wrap:wrap' });
-      brow.append(bt, bs);
-      row.appendChild(brow);
+      foot.append(bt, bs);
     }
-    shopBox.appendChild(row);
+    grid.appendChild(shopCard(d.name, d.blurb, SHOP_COLORS[id], foot));
   });
-
-  shopBox.appendChild(el('h2', {}, 'Golfer (the one who swings)'));
   ['classic'].concat(GOLFER_IDS).forEach(id => {
     const d = PACK_DEFS[id] || { name:'Classic', blurb:'The default golfer.', tk:0, sh:0 };
     const owned = id === 'classic' || !!w.packs[id];
     const worn = wornSkin() === id;
-    const row = el('div', { className:'review' });
-    row.appendChild(el('div', { className:'rh' }, d.name + (worn ? '  · wearing' : (owned ? '  · owned' : ''))));
-    row.appendChild(el('div', { className:'rt' }, d.blurb || ''));
-    const brow = el('div', { style:'margin-top:8px;display:flex;gap:8px;flex-wrap:wrap' });
+    const foot = el('div', { style:'display:flex;gap:6px;flex-wrap:wrap' });
     if (owned){
-      if (!worn){
-        const wb = el('button', { className:'btn sm' }, 'Wear');
-        wb.onclick = async () => say(await wearTx(id));
-        brow.appendChild(wb);
-      }
+      if (worn) foot.appendChild(el('span', { className:'muted' }, 'Wearing'));
+      else { const wb = el('button', { className:'btn sm' }, 'Wear'); wb.onclick = async () => say(await wearTx(id)); foot.appendChild(wb); }
     } else {
-      const bt = el('button', { className:'btn sm' }, 'Buy ' + d.tk + ' tokens');
+      const bt = el('button', { className:'btn sm' }, d.tk + ' tk');
       bt.onclick = async () => say(await buyTx(id, 'tk'));
-      const bs = el('button', { className:'btn sm' }, 'Buy ' + d.sh + ' shards');
+      const bs = el('button', { className:'btn sm' }, d.sh + ' sh');
       bs.onclick = async () => say(await buyTx(id, 'sh'));
-      brow.append(bt, bs);
+      foot.append(bt, bs);
     }
-    row.appendChild(brow);
-    shopBox.appendChild(row);
+    grid.appendChild(shopCard('Golfer: ' + d.name, d.blurb, SHOP_COLORS[id] || '#e2443a', foot));
   });
 
-  shopBox.appendChild(el('h2', {}, 'Decor (from decor packs)'));
+  // decor you own
+  const decorCard = el('div', { className:'card wide' });
+  decorCard.appendChild(el('h3', {}, 'Your decor'));
+  const tiles = el('div', { className:'tiles' });
   Object.keys(DECO_PACK_NAMES).forEach(key => {
     const n = (w.decor && w.decor[key]) || 0;
-    shopBox.appendChild(el('p', { className:'muted' }, DECO_PACK_NAMES[key] + ': ' + (n ? 'owned x' + n : 'not yet')));
+    tiles.appendChild(el('div', { className:'tile' + (n ? ' owned' : '') }, DECO_PACK_NAMES[key] + (n ? ' x' + n : '')));
   });
+  decorCard.appendChild(tiles);
+  grid.appendChild(decorCard);
+
+  shopBox.appendChild(grid);
   shopBox.appendChild(msg);
 }
 function openShop(){
   if (!user){ openSignIn(() => openShop()); return; }
+  closeAllModals();
+  const ov = el('div', { className:'overlay' });
+  const dlg = el('div', { className:'dialog shopdlg' });
+  const head = el('div', { className:'shophead' });
+  const x = el('button', { className:'btn sm' }, 'Close');
+  x.onclick = () => { if (!shopRolling){ ov.remove(); modalOpen = $('modalRoot').children.length > 0; } };
+  head.append(el('h2', {}, 'Shop'), x);
   shopBox = el('div');
-  modal('Shop', shopBox, [{ label:'Close' }]);
+  dlg.append(head, shopBox);
+  ov.appendChild(dlg);
+  ov.addEventListener('pointerdown', e => { if (e.target === ov && !shopRolling){ ov.remove(); modalOpen = $('modalRoot').children.length > 0; } });
+  $('modalRoot').appendChild(ov);
+  modalOpen = true;
   renderShop();
 }
 document.querySelectorAll('.walletBtn').forEach(b => b.onclick = openShop);
@@ -2823,30 +3019,29 @@ function drawPackFx(t){
   if (activePack === 'winter') drawWinterFx(t);
   if (activePack === 'aqua'){
     const nw = waterIdx.length;
-    for (let k = 0; k < Math.min(nw, 12); k++){
+    ctx.globalAlpha = 0.5;
+    for (let k = 0; k < Math.min(nw, 3); k++){
       const i = waterIdx[(k * 131 + 7) % nw], x0 = i % W, y0 = (i / W) | 0;
       const ang = t * 0.7 + k * 2;
-      const ix = Math.round(x0 + Math.sin(ang) * 6), iy = Math.round(y0 + Math.cos(t * 0.5 + k) * 2);
+      const ix = Math.round(x0 + Math.sin(ang) * 5), iy = Math.round(y0 + Math.cos(t * 0.5 + k) * 2);
       const dir = Math.cos(ang) > 0 ? 1 : -1;
       rect(ix - 2, iy, 5, 2, '#ffb040');
-      rect(ix - 2, iy, 5, 1, '#ffd27a');
       rect(dir > 0 ? ix - 4 : ix + 3, iy - 1, 2, 4, '#f08020');
-      rect(ix + dir, iy, 1, 1, '#1e2a3a');
     }
-    for (let k = 0; k < Math.min(nw, 60); k += 3){
+    for (let k = 0; k < Math.min(nw, 15); k += 3){
       const i = waterIdx[(k * 53 + 11) % nw], x0 = i % W, y0 = (i / W) | 0;
-      for (let s2 = 0; s2 < 6; s2++){
-        const sway = Math.round(Math.sin(t * 2 + s2 * 0.7 + k) * 1.2);
-        rect(x0 + sway, y0 - s2, 2, 1, s2 % 2 ? '#3fb06a' : '#2f8a4a');
+      for (let s2 = 0; s2 < 5; s2++){
+        const sway = Math.round(Math.sin(t * 2 + s2 * 0.7 + k) * 1);
+        rect(x0 + sway, y0 - s2, 2, 1, '#2f8a4a');
       }
     }
-    for (let k = 0; k < Math.min(iceIdx.length, 6); k++){
+    for (let k = 0; k < Math.min(iceIdx.length, 3); k++){
       const i = iceIdx[(k * 71 + 3) % iceIdx.length], x0 = i % W, y0 = (i / W) | 0;
       rect(x0 - 1, y0, 5, 2, '#d8f6ff');
-      rect(x0 - 1, y0, 5, 1, '#f4fdff');
-      rect(x0 + 3, y0 - 1, 2, 4, '#9fdcf2');
     }
-    for (const d of decos) rect(d.x - 3, d.y + 2, 7, 1, 'rgba(0,10,30,.35)');
+    ctx.globalAlpha = 0.18;
+    for (const d of decos) rect(d.x - 3, d.y + 2, 7, 1, '#00101e');
+    ctx.globalAlpha = 1;
   }
   if (activePack === 'volcanic' && heatList.length){
     for (let k = 0; k < 60; k++){
@@ -2915,6 +3110,14 @@ async function loadCommunity(){
   renderMenu();
 }
 let commSort = 'new';
+let courseQuery = '';
+function matchesQuery(it, q){
+  q = String(q || '').trim().toLowerCase();
+  if (!q) return true;
+  const u = q.match(/^\((.+)\)$/);
+  if (u) return String(it.ownerName || '').toLowerCase() === u[1].trim();
+  return String(it.name || '').toLowerCase().includes(q) || String(it.ownerName || '').toLowerCase().includes(q);
+}
 function sortCommunity(){
   if (!communityList) return;
   const by = { new:(a, b) => b.updatedMs - a.updatedMs, rating:(a, b) => b.rating - a.rating || b.reviewCount - a.reviewCount, reviews:(a, b) => b.reviewCount - a.reviewCount };
@@ -3268,6 +3471,7 @@ function renderMenu(){
   $('tabDevice').classList.toggle('on', menuTab === 'device');
   $('tabChains').classList.toggle('on', menuTab === 'chains');
   $('commSort').hidden = menuTab !== 'community';
+  $('courseSearch').hidden = menuTab !== 'community';
   $('commSort').value = commSort;
   renderConn();
   const grid = $('cards'); grid.innerHTML = '';
@@ -3293,7 +3497,9 @@ function renderMenu(){
   if (fbState === 'connecting' || commState.status === 'loading'){ empty('Loading courses...'); return; }
   if (commState.status === 'error'){ empty(commState.msg); return; }
   if (!communityList || !communityList.length){ empty('Nothing shared yet. Build a course and hit Publish online!'); return; }
-  communityList.forEach(it => grid.appendChild(cardEl(it, 'Community' + (it.ownerName ? ' | by ' + it.ownerName : ''), false)));
+  const shown = communityList.filter(it => matchesQuery(it, courseQuery));
+  if (!shown.length){ empty('No courses match that search.'); return; }
+  shown.forEach(it => grid.appendChild(cardEl(it, 'Community' + (it.ownerName ? ' | by ' + it.ownerName : ''), false)));
 }
 async function openCourse(rec, wantRole){
   try {
@@ -3548,7 +3754,7 @@ function drawHero(){
 /* ================================================================== *
  *  PLAY
  * ================================================================== */
-function canAim(){ return mode === 'play' && !swing && !react && !ball.moving && ball.sink === 0 && !ball.holed; }
+function canAim(){ return !walkMode && mode === 'play' && !swing && !react && !ball.moving && ball.sink === 0 && !ball.holed; }
 function resetBall(){
   ball.x = tee.x + .5; ball.y = tee.y + .5; ball.vx = ball.vy = 0; ball.z = 0;
   ball.air = false; ball.sink = 0; ball.holed = false; ball.moving = false;
@@ -3558,6 +3764,9 @@ function resetBall(){
   $('result').classList.remove('show');
 }
 function startPlay(){
+  walkMode = courseWalk === 'forced' || (courseWalk === 'optional' && walkMode);
+  $('walkBtn').textContent = 'Walk mode: ' + (walkMode ? 'on' : 'off');
+  $('walkBtn').disabled = courseWalk === 'forced';
   commitHole();
   const badIdx = holes.findIndex(h => !h.tee || !h.hole);
   if (badIdx !== -1){ toast(holes.length > 1 ? 'Hole ' + (badIdx + 1) + ' needs a tee spot and a hole' : 'Place a tee spot and a hole first'); return; }
@@ -3707,7 +3916,7 @@ function hazardCircles(t){
       const off = Math.sin((t / hazPeriod(hz)) * Math.PI * 2 + hz.phase) * hz.len, ar = (hz.angle || 0) * Math.PI / 180;
       out.push({ x:hz.x + Math.cos(ar) * off, y:hz.y + Math.sin(ar) * off, r:2.6, hz, off });
     } else if (hz.kind === 'spin'){
-      const a = (t / hazPeriod(hz)) * Math.PI * 2 + hz.phase;
+      const a = (getProp(hz, 'clockwise') === false ? -1 : 1) * (t / hazPeriod(hz)) * Math.PI * 2 + hz.phase;
       out.push({ x:hz.x + Math.cos(a) * hz.len, y:hz.y + Math.sin(a) * hz.len, r:1.7, hz, a });
       out.push({ x:hz.x - Math.cos(a) * hz.len, y:hz.y - Math.sin(a) * hz.len, r:1.7, hz, a: a + Math.PI });
     } else if (hz.kind === 'pendulum'){
@@ -3748,7 +3957,7 @@ function drawOneHazard(hz, t){
     rect(-2, -1, 5, 1, '#c48a4c');
     ctx.restore();
   } else if (hz.kind === 'spin'){
-    const a = (t / hazPeriod(hz)) * Math.PI * 2 + hz.phase;
+    const a = (getProp(hz, 'clockwise') === false ? -1 : 1) * (t / hazPeriod(hz)) * Math.PI * 2 + hz.phase;
     rect(hz.x - 1, hz.y - 1, 3, 3, 'rgba(0,0,0,.22)');
     for (const sign of [1, -1]){
       const ex = hz.x + Math.cos(a) * hz.len * sign, ey = hz.y + Math.sin(a) * hz.len * sign;
@@ -3965,7 +4174,7 @@ function checkSpecials(){
     }
     if (sp.kind === 'timedgate'){
       const period = getProp(sp, 'period');
-      if (Math.floor(simTime / period) % 2 === 0) continue;
+      if (Math.floor((simTime + (getProp(sp, 'startOpen') ? 0 : period)) / period) % 2 === 0) continue;
       const rad = (sp.angle || 0) * Math.PI / 180, ux = Math.cos(rad), uy = Math.sin(rad);
       const sc = sp.scale || 1, half = 6 * sc, thick = 1.2 * sc;
       const dx = ball.x - cx, dy = ball.y - cy;
@@ -3986,7 +4195,7 @@ function checkSpecials(){
       const along = dx * ux + dy * uy, across = -dx * uy + dy * ux;
       if (Math.abs(along) > half || Math.abs(across) > width) continue;
       const push = getProp(sp, 'strength') / 100 * 0.03;
-      if (Math.hypot(ball.vx, ball.vy) < 4){ ball.vx += ux * push; ball.vy += uy * push; }
+      if (Math.hypot(ball.vx, ball.vy) < getProp(sp, 'maxSpeed')){ ball.vx += ux * push; ball.vy += uy * push; }
       continue;
     }
     if (sp.kind === 'cannon'){
@@ -3995,7 +4204,7 @@ function checkSpecials(){
       const ux = Math.cos(rad), uy = Math.sin(rad);
       ball.x = cx + ux * 3; ball.y = cy + uy * 3;
       ball.vx = ux * speed; ball.vy = uy * speed;
-      ball.padCd = 30;
+      ball.padCd = getProp(sp, 'cooldown');
       if (getProp(sp, 'arc')){ ball.air = true; ball.t = 0; ball.T = clamp(Math.round(12 + speed * 6), 12, 60); ball.H = clamp(speed * 4, 6, 40); }
       else ball.air = false;
       sfx.hit();
@@ -4067,7 +4276,7 @@ function drawOneSpecial(sp, t){
     else { rect(-6, -1, 12, 2, '#8a8f9a'); rect(-6, -1, 12, 1, '#b0b5c0'); }
     ctx.restore();
   } else if (sp.kind === 'timedgate'){
-    const open = Math.floor(simTime / getProp(sp, 'period')) % 2 === 0;
+    const gp = getProp(sp, 'period'), open = Math.floor((simTime + (getProp(sp, 'startOpen') ? 0 : gp)) / gp) % 2 === 0;
     ctx.save(); ctx.translate(x + .5, y + .5); ctx.rotate(rad); ctx.scale(s, s);
     rect(-7, -3, 2, 6, '#5a5a66'); rect(5, -3, 2, 6, '#5a5a66');
     if (open){
@@ -4288,10 +4497,30 @@ function handleLinkClick(p){
   plate.props.linkId = target.uid;
   linkMode = null; changed = true; toast('Plate linked to the door'); syncUI();
 }
+function stepWalk(){
+  if (ball.holed) return;
+  const ix = (walkKeys.d ? 1 : 0) - (walkKeys.a ? 1 : 0), iy = (walkKeys.s ? 1 : 0) - (walkKeys.w ? 1 : 0);
+  const il = Math.hypot(ix, iy);
+  if (il > 0){
+    const dx = ix / il, dy = iy / il;
+    // hills: a step uphill is slower, a step downhill quicker, judged by the height just ahead
+    const cx = clamp(Math.floor(ball.x), 0, W-1), cy = clamp(Math.floor(ball.y), 0, H-1);
+    const ax = clamp(Math.round(cx + dx * 2), 0, W-1), ay = clamp(Math.round(cy + dy * 2), 0, H-1);
+    const dh = elev[ay*W + ax] - elev[cy*W + cx];
+    const climb = clamp(1 - dh * 0.12, 0.3, 1.6);
+    const target = WALK_SPEED * climb;
+    ball.vx += (dx * target - ball.vx) * 0.4; ball.vy += (dy * target - ball.vy) * 0.4;
+    if (ix) ball.facing = ix > 0 ? 1 : -1;
+  } else { ball.vx *= 0.5; ball.vy *= 0.5; }
+  ball.moving = true;
+  if (moveBall(Math.max(1, Math.ceil(Math.hypot(ball.vx, ball.vy))), false)) return;
+  checkHazards(); checkPortals(); checkRails(); checkSpecials();
+}
 function stepBall(){
   if (ball.holed) return;
   updatePlates();
   if (ball.sink > 0){ ball.sink++; if (ball.sink > 36 && !react) onHoleDone(); return; }
+  if (walkMode && !ball.blackhole){ stepWalk(); return; }
   if (ball.blackhole){ stepBlackholeOrbit(); return; }
   if (!ball.moving) return;
   if (ball.air){
@@ -4639,7 +4868,9 @@ function toggleClub(id){
 $('clubWoodBtn').onclick = () => toggleClub('driver');
 $('clubPutterBtn').onclick = () => toggleClub('putter');
 $('lockBtn').onclick = () => { courseLocked = !courseLocked; changed = true; syncUI(); };
+$('walkBtn').onclick = () => { if (courseWalk === 'forced'){ toast('This course is walk only'); return; } walkMode = !walkMode; walkKeys.w = walkKeys.a = walkKeys.s = walkKeys.d = false; $('walkBtn').textContent = 'Walk mode: ' + (walkMode ? 'on' : 'off'); };
 TERRAIN_IDS.forEach(id => $('texturePackSel').appendChild(el('option', { value:id }, PACK_DEFS[id].name)));
+$('walkSel').onchange = e => { courseWalk = e.target.value; changed = true; dirty = true; syncUI(); };
 $('texturePackSel').onchange = async e => {
   const v = e.target.value;
   if (v !== 'none' && !(wallet && wallet.packs && wallet.packs[v])){ toast('You do not own that pack'); syncUI(); return; }
@@ -4670,6 +4901,7 @@ $('tabCommunity').onclick = () => { menuTab = 'community'; renderMenu(); };
 $('tabDevice').onclick = () => { menuTab = 'device'; renderMenu(); };
 $('tabChains').onclick = () => { menuTab = 'chains'; renderMenu(); };
 $('commSort').onchange = e => { commSort = e.target.value; sortCommunity(); renderMenu(); };
+$('courseSearch').oninput = e => { courseQuery = e.target.value; renderMenu(); };
 $('achBtn').onclick = openAchievements;
 $('mNew').onclick = openNew; $('mImport').onclick = openImport;
 $('mRedeem').onclick = openRedeemInvite;
@@ -4781,6 +5013,7 @@ function syncUI(){
   $('undoBtn').disabled = !undoStack.length; $('redoBtn').disabled = !redoStack.length;
   const online = curCourse.source === 'online', owned = canEdit();
   if ($('texturePackSel')) $('texturePackSel').value = activePack;
+  if ($('walkSel')) $('walkSel').value = courseWalk;
   $('pubBtn').textContent = online ? (owned ? 'Update online' : 'Publish as new') : 'Publish online';
   $('pubNewBtn').hidden = !(online && owned);
   $('pubBtn').disabled = pubBusy; $('pubNewBtn').disabled = pubBusy;
@@ -4888,6 +5121,53 @@ function frame(now){
   requestAnimationFrame(frame);
 }
 
+/* ---------- intro ---------- */
+(function introScreen(){
+  const intro = $('intro'), fill = $('introFill'), stage = $('introStage'), g = $('introCv').getContext('2d');
+  g.clearRect(0, 0, 64, 64);
+  for (let r = 30; r >= 16; r -= 2){
+    g.globalAlpha = (30 - r) / 40; g.strokeStyle = '#6a4ba0'; g.lineWidth = 1;
+    g.beginPath(); g.arc(32, 32, r, 0, Math.PI * 2); g.stroke();
+  }
+  g.globalAlpha = 1;
+  g.fillStyle = '#000'; g.beginPath(); g.arc(32, 32, 12, 0, Math.PI * 2); g.fill();
+  for (let k = 0; k < 16; k++){
+    const a = k * Math.PI / 8;
+    g.fillStyle = k % 2 ? '#8a6bc0' : '#d8c8ff';
+    g.fillRect(Math.round(32 + Math.cos(a) * 18), Math.round(32 + Math.sin(a) * 18), 2, 2);
+  }
+  let phase = 0, t0 = performance.now(), offlineMsg = false;
+  const set = (pct, msg) => { fill.style.width = pct + '%'; stage.textContent = msg; };
+  function finish(){
+    set(100, 'Click to load in');
+    stage.classList.add('ready');
+    intro.addEventListener('click', () => { intro.classList.add('gone'); setTimeout(() => intro.remove(), 450); }, { once:true });
+  }
+  function tick(now){
+    const e = now - t0;
+    if (phase === 0){
+      const pct = Math.min(33, e / 1200 * 33);
+      set(pct, 'Loading Game..');
+      if (pct >= 33){ phase = 1; t0 = now; }
+    } else if (phase === 1){
+      if (!offlineMsg){
+        const ready = fbState === 'ok' || fbState === 'fail' || e > 4000;
+        const pct = 33 + Math.min(33, e / 1200 * 33);
+        set(pct, 'Connecting to Server..');
+        if (pct >= 66 && ready){
+          if (fbState !== 'ok'){ offlineMsg = true; set(66, 'Unable to Connect to Server, continuing in offline mode'); t0 = now; }
+          else { phase = 2; t0 = now; }
+        }
+      } else if (e > 2200){ phase = 2; t0 = now; }
+    } else if (phase === 2){
+      const pct = 66 + Math.min(34, e / 1000 * 34);
+      set(pct, 'Finalizing and Launching..');
+      if (pct >= 100){ phase = 3; finish(); return; }
+    }
+    requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+})();
 newCourse('My course', T.VOID);
 drawHero();
 menuTab = 'community';

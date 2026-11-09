@@ -973,11 +973,14 @@ function blockH(x, y){
   return decoSolid[i] ? DECO_H : 0;
 }
 let probeWall = false;
+let probeBoundary = false;
 const PROBE = [[0,0],[-1.2,0],[1.2,0],[0,-1.2],[0,1.2]];
 function probe(x, y){
-  probeWall = false; let h = 0;
+  probeWall = false; probeBoundary = false; let h = 0;
   for (const p of PROBE){
-    const hh = blockH(x + p[0], y + p[1]);
+    const px = x + p[0], py = y + p[1], bx = Math.floor(px), by = Math.floor(py);
+    if (bx < 2 || by < 2 || bx >= W-2 || by >= H-2) probeBoundary = true;
+    const hh = blockH(px, py);
     if (hh > h) h = hh;
     if (hh === WALL_H || hh === MOUNTAIN_H) probeWall = true;
   }
@@ -3863,7 +3866,7 @@ function moveBall(n, air){
   for (let i = 0; i < n; i++){
     let nx = ball.x + ball.vx / n, ny = ball.y + ball.vy / n;
     const h = probe(nx, ny);
-    if (h && (!air || ball.z < h)){
+    if (h && (!air || ball.z < h || probeBoundary)){
       const e = probeWall ? 0.82 : 0.45, wall = probeWall;
       const nrm = contactNormal(nx, ny, air, ball.z);
       let hit = false, imp = 0;
